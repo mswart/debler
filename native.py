@@ -26,6 +26,7 @@ db = {
 gem = sys.argv[1]
 version = sys.argv[2]
 level = int(sys.argv[3])
+rubies = ['2.2', '2.1']
 
 if not os.path.isdir(gem):
     os.mkdir(gem)
@@ -53,7 +54,7 @@ with tempfile.TemporaryDirectory() as d:
         with open(os.path.join(d, own_name, 'debian', 'source', 'format'), 'w') as f:
             f.write("3.0 (quilt)\n")
 
-        with open(os.path.join(d, own_name, 'debian', 'compact'), 'w') as f:
+        with open(os.path.join(d, own_name, 'debian', 'compat'), 'w') as f:
             f.write("9\n")
 
         with open(os.path.join(d, own_name, 'debian', 'copyright'), 'w') as f:
@@ -77,13 +78,13 @@ Licence: See LICENCE file
 """.format(own_name, own_version, 'trusty', datetime.now(tz=tzlocal()).strftime('%a, %d %b %Y %H:%M:%S %z')))
 
         build_deps = [
+            'debhelper',
             'python3',
             'python3-yaml',
-            'ruby2.1',
-            'ruby2.1-dev',
-            'ruby2.2',
-            'ruby2.2-dev'
         ]
+        for ruby in rubies:
+            build_deps.append('ruby{}'.format(ruby))
+            build_deps.append('ruby{}-dev'.format(ruby))
 
         if metadata['name'] in db:
             build_deps.append(db[metadata['name']])
@@ -109,7 +110,7 @@ Licence: See LICENCE file
             for l in range(1, level):
                 priovide.append('debler-rubygem-{}-{}'.format(metadata['name'], '.'.join(version_parts[:l])))
             control['Provides'] = ', '.join(priovide)
-        control['Architecture'] = 'any'
+        control['Architecture'] = 'all'
         deps = []
         for dep in metadata['dependencies']:
             if dep['type'] != ':runtime':
@@ -127,45 +128,83 @@ Licence: See LICENCE file
                     deps.append('{} (<= {})'.format(req, '.'.join(up)))
             if not versioned_deps:
                 deps.append(req)
+        deps.append('${shlibs:Depends}')
+        deps.append('${misc:Depends}')
+        deps.append(' | '.join([own_name + '-ruby' + ruby for ruby in rubies]))
+
         control['Depends'] = ', '.join(deps)
         control['Section'] = 'ruby'
         control['Homepage'] = metadata['homepage']
         control['Description'] = metadata['summary']
         control['Description'] += ('\n' + metadata['description']).replace('\n\n', '\n.\n').replace('\n', '\n ')
 
+        control_file.write(b'\n')
         control.dump(control_file)
 
+        for ruby in rubies:
+            control = Deb822()
+            control['Package'] = own_name + '-ruby' + ruby
+            control['Architecture'] = 'any'
+            control['Depends'] = '${shlibs:Depends}, ${misc:Depends}'
+            control['Section'] = 'ruby'
+            control['Description'] = metadata['summary']
+            control['Description'] += '\n Native extension for ruby' + ruby
+            control_file.write(b'\n')
+            control.dump(control_file)
         control_file.close()
 
+        rules = {}
+        rules['build'] = []
+        rules['build'].append('mkdir src')
+        rules['build'].append('tar --extract --verbose --directory src --file data.tar.gz')
+        rules['build'].append(' v'.join(['mkdir'] + rubies))
+        assert len(metadata['extensions']) == 1
+        for ruby in rubies:
+            rules['build'].append('cd v{v} && ruby{v} ../src/{}'.format(metadata['extensions'][0], v=ruby))
+        for ruby in rubies:
+            rules['build'].append('make -C v{v}'.format(v=ruby))
+
+        rules['install'] = []
+        for ruby in rubies:
+            rules['install'].append(' '.join([
+                'dh_install',
+                '-p{package}',
+                'v{v}/*.so',
+                '/usr/lib/${{DEB_BUILD_MULTIARCH}}/ruby/debler-rubygems/{name}/{v}.0/']).format(
+                    v=ruby, name=own_name[15:], package=own_name + '-ruby' + ruby))
+
         with open(os.path.join(d, own_name, 'debian', 'rules'), 'w') as f:
-            f.write("""#!/usr/bin/make -f
-clean:
-\ttrue
+            f.write("#!/usr/bin/make -f\n%:\n\tdh $@")
+            for target in rules:
+                f.write('\noverride_dh_auto_{target}:\n\t'.format(target=target))
+                f.write('\n\t'.join(rules[target]))
 
-build:
-\tmkdir src
-\ttar --extract --verbose --directory src --file data.tar.gz
-\tmkdir v2.1 v2.2
-\tcd v2.1 && ruby2.1 ../src/ext/extconf.rb
-\tcd v2.2 && ruby2.2 ../src/ext/extconf.rb
-\tmake -C v2.1
-\tmake -C v2.2
-
-binary:
-\t todo
-
-%:
-\tfalse
-""".format(own_name))
         subprocess.check_call(['gzip', '-1', os.path.join(d, '{}_{}.orig.tar'.format(
                                own_name, metadata['version']['version']))])
+
+        os.makedirs(os.path.join(d, 'usr', 'lib', 'ruby', 'debler-rubygems', control['Package'][15:]))
+        with open(os.path.join(d, own_name, 'debian', own_name + '.install'), 'w') as f:
+            with tarfile.open(fileobj=t.extractfile('data.tar.gz')) as dt:
+                members = dt.getmembers()
+                for member in members:
+                    for path in metadata['require_paths']:
+                        if member.name.startswith(path):
+                            break
+                    else:
+                        continue
+                    f.write('src/{file} /usr/lib/ruby/debler-rubygems/{name}/{dir}\n'.format(
+                        name=control['Package'][15:],
+                        file=member.name,
+                        dir=os.path.dirname(member.name)))
 
     os.chdir(os.path.join(d, own_name))
 
     subprocess.call(['find', '.'])
     subprocess.call(['cat', 'debian/control'])
     subprocess.call(['cat', 'debian/changelog'])
-    subprocess.call(['dpkg-source', '-b', '.'])
+    subprocess.call(['cat', 'debian/{}.install'.format(own_name)])
+    subprocess.call(['cat', 'debian/rules'])
+    subprocess.check_call(['dpkg-source', '-b', '.'])
 
     os.chdir(os.path.join(d))
-    subprocess.check_call(['sbuild', '-d', 'trusty', '{}_{}.dsc'.format(own_name, own_version)])
+    subprocess.check_call(['sbuild', '--dist', 'trusty', '{}_{}.dsc'.format(own_name, own_version)])
