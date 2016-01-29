@@ -99,9 +99,10 @@ Licence: See LICENCE file
         build_deps = [
             'debhelper',
         ]
-        for ruby in rubies:
-            build_deps.append('ruby{}'.format(ruby))
-            build_deps.append('ruby{}-dev'.format(ruby))
+        if len(metadata['extensions']) > 0:
+            for ruby in rubies:
+                build_deps.append('ruby{}'.format(ruby))
+                build_deps.append('ruby{}-dev'.format(ruby))
 
         if metadata['name'] in db:
             build_deps.append(db[metadata['name']])
@@ -147,7 +148,8 @@ Licence: See LICENCE file
                 deps.append(req)
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')
-        deps.append(' | '.join([own_name + '-ruby' + ruby for ruby in rubies]))
+        if len(metadata['extensions']) > 0:
+            deps.append(' | '.join([own_name + '-ruby' + ruby for ruby in rubies]))
 
         control['Depends'] = ', '.join(deps)
         control['Section'] = 'ruby'
@@ -158,37 +160,40 @@ Licence: See LICENCE file
         control_file.write(b'\n')
         control.dump(control_file)
 
-        for ruby in rubies:
-            control = Deb822()
-            control['Package'] = own_name + '-ruby' + ruby
-            control['Architecture'] = 'any'
-            control['Depends'] = '${shlibs:Depends}, ${misc:Depends}'
-            control['Section'] = 'ruby'
-            control['Description'] = metadata['summary']
-            control['Description'] += '\n Native extension for ruby' + ruby
-            control_file.write(b'\n')
-            control.dump(control_file)
+        if len(metadata['extensions']) > 0:
+            for ruby in rubies:
+                control = Deb822()
+                control['Package'] = own_name + '-ruby' + ruby
+                control['Architecture'] = 'any'
+                control['Depends'] = '${shlibs:Depends}, ${misc:Depends}'
+                control['Section'] = 'ruby'
+                control['Description'] = metadata['summary']
+                control['Description'] += '\n Native extension for ruby' + ruby
+                control_file.write(b'\n')
+                control.dump(control_file)
         control_file.close()
 
         rules = {}
         rules['build'] = []
         rules['build'].append('mkdir src')
         rules['build'].append('tar --extract --verbose --directory src --file data.tar.gz')
-        rules['build'].append(' v'.join(['mkdir'] + rubies))
-        assert len(metadata['extensions']) == 1
-        for ruby in rubies:
-            rules['build'].append('cd v{v} && ruby{v} ../src/{}'.format(metadata['extensions'][0], v=ruby))
-        for ruby in rubies:
-            rules['build'].append('make -C v{v}'.format(v=ruby))
+        if len(metadata['extensions']) > 0:
+            rules['build'].append(' v'.join(['mkdir'] + rubies))
+            assert len(metadata['extensions']) == 1
+            for ruby in rubies:
+                rules['build'].append('cd v{v} && ruby{v} ../src/{}'.format(metadata['extensions'][0], v=ruby))
+            for ruby in rubies:
+                rules['build'].append('make -C v{v}'.format(v=ruby))
 
         rules['install'] = []
-        for ruby in rubies:
-            rules['install'].append(' '.join([
-                'dh_install',
-                '-p{package}',
-                'v{v}/*.so',
-                '/usr/lib/${{DEB_BUILD_MULTIARCH}}/ruby/debler-rubygems/{v}.0/{name}/']).format(
-                    v=ruby, name=own_name[15:], package=own_name + '-ruby' + ruby))
+        if len(metadata['extensions']) > 0:
+            for ruby in rubies:
+                rules['install'].append(' '.join([
+                    'dh_install',
+                    '-p{package}',
+                    'v{v}/*.so',
+                    '/usr/lib/${{DEB_BUILD_MULTIARCH}}/ruby/debler-rubygems/{v}.0/{name}/']).format(
+                        v=ruby, name=own_name[15:], package=own_name + '-ruby' + ruby))
 
         with open(os.path.join(own_name, 'debian', 'rules'), 'w') as f:
             f.write("#!/usr/bin/make -f\n%:\n\tdh $@")
