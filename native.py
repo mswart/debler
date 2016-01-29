@@ -129,7 +129,7 @@ Licence: See LICENCE file
             priovide.append(gemnam2deb(metadata['name']))
             for l in range(1, level):
                 priovide.append(gemnam2deb(metadata['name'] + '-' + '.'.join(version_parts[:l])))
-            control['Provides'] = ', '.join(priovide)
+            control['Provides'] = ', '.join(['{} (= {})'.format(p, gem_version) for p in priovide])
         control['Architecture'] = 'all'
         deps = []
         for dep in metadata['dependencies']:
@@ -141,8 +141,11 @@ Licence: See LICENCE file
                 if version[0] == '>=' and version[1]['version'] == '0':
                     continue
                 if version[0] == '~>':
-                    deps.append('{} (>= {})'.format(req, version[1]['version']))
+                    req_level = db[dep['name']]['level']
                     up = version[1]['version'].split('.')
+                    if req_level > 0:
+                        req += '-' + '.'.join(up[:req_level])
+                    deps.append('{} (>= {})'.format(req, version[1]['version']))
                     up[-1] = '0'
                     up[-2] = str(int(up[-2]) + 1)
                     deps.append('{} (<= {})'.format(req, '.'.join(up)))
