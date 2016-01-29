@@ -19,14 +19,11 @@ def construct_ruby_object(loader, suffix, node):
 
 yaml.add_multi_constructor(u"!ruby/object:", construct_ruby_object)
 
-db = {
-    'pg': 'libpq-dev'
-}
-
+db = yaml.load(open(os.path.realpath(os.path.join(__file__, '..', 'db.yml'))))
 
 gem = sys.argv[1]
 version = sys.argv[2]
-level = int(sys.argv[3])
+level = db[gem]['level']
 rubies = ['2.2', '2.1']
 
 if not os.path.isdir(gem):
@@ -104,8 +101,8 @@ Licence: See LICENCE file
                 build_deps.append('ruby{}'.format(ruby))
                 build_deps.append('ruby{}-dev'.format(ruby))
 
-        if metadata['name'] in db:
-            build_deps.append(db[metadata['name']])
+        if db[metadata['name']].get('builddeps'):
+            build_deps.append(db[metadata['name']]['builddeps'])
         control_file = open(os.path.join(own_name, 'debian', 'control'), 'wb')
 
         dsc = Dsc()
