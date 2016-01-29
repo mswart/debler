@@ -174,16 +174,13 @@ Licence: See LICENCE file
         rules['build'] = []
         rules['build'].append('mkdir src')
         rules['build'].append('tar --extract --verbose --directory src --file data.tar.gz')
-        if len(metadata['extensions']) > 0:
+        rules['install'] = []
+        if len(metadata['extensions']) == 1:
             rules['build'].append(' v'.join(['mkdir'] + rubies))
-            assert len(metadata['extensions']) == 1
             for ruby in rubies:
                 rules['build'].append('cd v{v} && ruby{v} ../src/{}'.format(metadata['extensions'][0], v=ruby))
             for ruby in rubies:
                 rules['build'].append('make -C v{v}'.format(v=ruby))
-
-        rules['install'] = []
-        if len(metadata['extensions']) > 0:
             for ruby in rubies:
                 rules['install'].append(' '.join([
                     'dh_install',
@@ -191,6 +188,26 @@ Licence: See LICENCE file
                     'v{v}/*.so',
                     '/usr/lib/${{DEB_BUILD_MULTIARCH}}/ruby/debler-rubygems/{v}.0/{name}/']).format(
                         v=ruby, name=own_name[15:], package=own_name + '-ruby' + ruby))
+
+        elif len(metadata['extensions']) > 1:
+            rules['build'].append(' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in metadata['extensions'] for ruby in rubies]))
+            for ext in metadata['extensions']:
+                for ruby in rubies:
+                    rules['build'].append('cd v{v}/{ext} && ruby{v} ../../src/{}'.format(
+                        ext, ext=ext.replace('/', '_'), v=ruby))
+            for ext in metadata['extensions']:
+                for ruby in rubies:
+                    rules['build'].append('make -C v{v}/{ext}'.format(
+                        ext=ext.replace('/', '_'), v=ruby))
+            for ext in metadata['extensions']:
+                for ruby in rubies:
+                    rules['install'].append(' '.join([
+                        'dh_install',
+                        '-p{package}',
+                        'v{v}/{ext}/*.so',
+                        '/usr/lib/${{DEB_BUILD_MULTIARCH}}/ruby/debler-rubygems/{v}.0/{name}/']).format(
+                            v=ruby, name=own_name[15:], package=own_name + '-ruby' + ruby,
+                            ext=ext.replace('/', '_')))
 
         with open(os.path.join(own_name, 'debian', 'rules'), 'w') as f:
             f.write("#!/usr/bin/make -f\n%:\n\tdh $@")
