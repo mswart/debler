@@ -194,7 +194,7 @@ Licence: See LICENCE file
                     'dh_install',
                     '-p{package}',
                     'v{v}/*.so',
-                    '/usr/lib/${{DEB_BUILD_MULTIARCH}}/ruby/debler-rubygems/{v}.0/{name}/']).format(
+                    '/usr/lib/${{DEB_BUILD_MULTIARCH}}/rubygems-debler/{v}.0/{name}/']).format(
                         v=ruby, name=own_name, package=deb_name + '-ruby' + ruby))
 
         elif len(metadata['extensions']) > 1:
@@ -213,7 +213,7 @@ Licence: See LICENCE file
                         'dh_install',
                         '-p{package}',
                         'v{v}/{ext}/*.so',
-                        '/usr/lib/${{DEB_BUILD_MULTIARCH}}/ruby/debler-rubygems/{v}.0/{name}/']).format(
+                        '/usr/lib/${{DEB_BUILD_MULTIARCH}}/rubygems-debler/{v}.0/{name}/']).format(
                             v=ruby, name=own_name, package=deb_name + '-ruby' + ruby,
                             ext=ext.replace('/', '_')))
 
@@ -232,7 +232,7 @@ Licence: See LICENCE file
                             break
                     else:
                         continue
-                    f.write('src/{file} /usr/lib/ruby/debler-rubygems/{name}/{dir}\n'.format(
+                    f.write('src/{file} /usr/share/rubygems-debler/{name}/{dir}\n'.format(
                         name=own_name,
                         file=member.name,
                         dir=os.path.dirname(member.name)))
