@@ -20,7 +20,7 @@ obligation:
   level: 1
 pg:
   level: 1
-  builddeps: libpq
+  builddeps: libpq-dev
 rack:
   level: 2
 restify:
