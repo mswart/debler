@@ -43,6 +43,13 @@ class Database():
             print(pkg)
             yield pkg
 
+    def update_build(self, name, slot, version, revision, state):
+        c = self.conn.cursor()
+        c.execute('UPDATE package_versions SET state = %s'
+                  + ' WHERE name = %s AND slot = %s AND version = %s AND revision = %s',
+                  (state, name, slot, version, revision))
+        self.conn.commit()
+
     def create_gem_version(self, name, slot, *, version, revision,
                            debler_version=[1, 0], changelog, distribution):
         now = datetime.now(tz=tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z')
