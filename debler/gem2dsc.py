@@ -27,6 +27,7 @@ class Converter():
         self.gem_version = version
         self.gem_version_s = '.'.join([str(v) for v in version])
         self.revision = revision
+        self.deb_version = self.gem_version_s + '-' + str(revision)
 
         self.own_name = self.gem_name
         if self.gem_slot:
@@ -133,12 +134,11 @@ Licence: See LICENCE file
         changes = Changelog()
         for version, revision, scheduled_at, change, distribution in self.db.changelog_entries(self.gem_name, self.gem_slot):
             deb_version = '.'.join([str(v) for v in version]) + '-' + str(revision)
-            changes.new_block(package=self.deb_name, version='.'.join([str(v) for v in version]) + '-' + str(revision),
+            changes.new_block(package=self.deb_name, version=deb_version,
                               distributions=distribution, urgency='low',
                               author='Debler Automatic Rubygems Packager <debler@dxtt.de>',
                               date=scheduled_at.strftime('%a, %d %b %Y %H:%M:%S %z'))
             changes.add_change('\n  * ' + change + '\n')
-            self.deb_version = deb_version
         with open(self.debian_file('changelog'), 'w') as f:
             changes.write_to_open_file(f)
 

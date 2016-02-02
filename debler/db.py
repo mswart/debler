@@ -67,7 +67,8 @@ class Database():
         c = self.conn.cursor()
         c.execute("""SELECT version, revision, scheduled_at, changelog, distribution
             FROM package_versions
-            WHERE name=%s and slot = %s;""", (name, list(slot)))
+            WHERE name=%s and slot = %s
+            ORDER BY version ASC, revision ASC;""", (name, list(slot)))
         for entry in c:
             yield entry
 
