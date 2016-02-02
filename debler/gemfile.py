@@ -31,6 +31,9 @@ class Parser():
     def parse_PLATFORMS(self, lines):
         assert lines[0].strip() == 'ruby'
 
+    def parse_DEPENDENCIES(self, lines):
+        pass
+
 if __name__ == '__main__':
     import sys
     from pprint import pprint
