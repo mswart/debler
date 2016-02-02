@@ -173,7 +173,7 @@ Licence: See LICENCE file
             priovide.append(self.gemnam2deb(self.gem_name))
             for l in range(1, level):
                 priovide.append(self.gemnam2deb(self.gem_name + '-' + '.'.join([str(v) for v in self.gem_version[:l]])))
-            control['Provides'] = ', '.join(['{} (= {})'.format(p, self.gem_version_s) for p in priovide])
+            control['Provides'] = ', '.join(priovide)
         control['Architecture'] = 'all'
         deps = []
         for dep in self.metadata['dependencies']:
