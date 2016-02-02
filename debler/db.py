@@ -6,7 +6,7 @@ from dateutil.tz import tzlocal
 
 
 class Database():
-    current_debler_version = [1, 1]
+    current_debler_version = [1, 2]
 
     def __init__(self):
         self.conn = psycopg2.connect('dbname=debler')

@@ -209,7 +209,7 @@ Licence: See LICENCE file
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')
         if len(self.metadata['extensions']) > 0:
-            deps.append(' | '.join([self.deb_name + '-ruby' + ruby for ruby in rubies]))
+            deps.append(' | '.join(['{}-ruby{} (= ${{binary:Version}})'.format(self.deb_name, ruby) for ruby in rubies]))
 
         control['Depends'] = ', '.join(deps)
         control['Section'] = 'ruby'
@@ -282,7 +282,7 @@ Licence: See LICENCE file
             with tarfile.open(self.src_file) as t, tarfile.open(fileobj=t.extractfile('data.tar.gz')) as dt:
                 members = dt.getmembers()
                 for member in members:
-                    for path in self.metadata['require_paths']:
+                    for path in self.metadata['require_paths'] + ['data']:
                         if member.name.startswith(path):
                             break
                     else:
