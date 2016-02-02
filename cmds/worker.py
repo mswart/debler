@@ -25,3 +25,5 @@ for data in db.scheduled_builds():
         print(e)
     #finally:
         #break
+
+gem2dsc.publish()
