@@ -306,11 +306,9 @@ Licence: See LICENCE file
 
 def publish():
     os.chdir(Converter.WORKDIR)
-    subprocess.check_call(['apt-ftparchive', 'packages', '.'], stdout=open('Packages.new', 'wb'))
-    subprocess.check_call(['apt-ftparchive', 'release', '.'], stdout=open('Release.new', 'wb'))
+    subprocess.check_call(['apt-ftparchive', 'packages', '.'], stdout=open('Packages', 'wb'))
+    subprocess.check_call(['apt-ftparchive', 'release', '.'], stdout=open('Release', 'wb'))
     subprocess.check_call(['gpg', '--clearsign', '-u', '0xDAE2696E26F4ADC4', '-o', 'InRelease.new', 'Release'])
     subprocess.check_call(['gpg', '-abs', '-u', '0xDAE2696E26F4ADC4', '-o', 'Release.gpg.new', 'Release'])
-    os.rename('Packages.new', 'Packages')
-    os.rename('Release.new', 'Release')
     os.rename('InRelease.new', 'InRelease')
     os.rename('Release.gpg.new', 'Release.gpg')
