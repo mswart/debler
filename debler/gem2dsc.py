@@ -135,7 +135,7 @@ Licence: See LICENCE file
             deb_version = '.'.join([str(v) for v in version]) + '-' + str(revision)
             changes.new_block(package=self.deb_name, version='.'.join([str(v) for v in version]) + '-' + str(revision),
                               distributions=distribution, urgency='low',
-                              author='Malte Swart <packages@devtation.de>',
+                              author='Debler Automatic Rubygems Packager <debler@dxtt.de>',
                               date=scheduled_at.strftime('%a, %d %b %Y %H:%M:%S %z'))
             changes.add_change('\n  * ' + change + '\n')
             self.deb_version = deb_version
@@ -159,7 +159,7 @@ Licence: See LICENCE file
         dsc = Dsc()
         dsc['Source'] = self.deb_name
         dsc['Priority'] = 'optional'
-        dsc['Maintainer'] = 'Malte Swart <mswart@devtation.de>'
+        dsc['Maintainer'] = 'Debler Automatic Rubygems Packager <debler@dxtt.de>'
         dsc['Homepage'] = self.metadata['homepage']
         dsc['Standards-Version'] = '3.9.6'
         dsc['Build-Depends'] = ', '.join(build_deps)
