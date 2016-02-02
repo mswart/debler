@@ -297,4 +297,8 @@ Licence: See LICENCE file
         subprocess.check_call(['dpkg-source', '-b', '.'])
         os.chdir(self.slot_dir)
 
-        subprocess.check_call(['sbuild', '--dist', 'trusty', '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
+        subprocess.check_call(['sbuild',
+                               '--dist', 'trusty',
+                               '--keyid', '0xDAE2696E26F4ADC4',
+                               '--maintainer', 'Debler Automatic Rubygems Packager <debler@dxtt.de>',
+                               '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
