@@ -6,6 +6,8 @@ from dateutil.tz import tzlocal
 
 
 class Database():
+    current_debler_version = [1, 0]
+
     def __init__(self):
         self.conn = psycopg2.connect('dbname=debler')
 
@@ -51,13 +53,13 @@ class Database():
         self.conn.commit()
 
     def create_gem_version(self, name, slot, *, version, revision,
-                           debler_version=[1, 0], changelog, distribution):
+                           debler_version=None, changelog, distribution):
         now = datetime.now(tz=tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z')
         c = self.conn.cursor()
         c.execute("""INSERT INTO package_versions (name, slot, version, revision,
                 debler_version, scheduled_at, changelog, distribution)
              VALUES (%s, %s, %s, %s, %s, %s, %s, %s);""",
-                  (name, list(slot), version, revision, debler_version,
+                  (name, list(slot), version, revision, debler_version or self.current_debler_version,
                    now, changelog, distribution))
         self.conn.commit()
 
@@ -68,3 +70,22 @@ class Database():
             WHERE name=%s and slot = %s;""", (name, list(slot)))
         for entry in c:
             yield entry
+
+    def debler_format_rebuild(self, changelog):
+        c = self.conn.cursor()
+        c.execute("""SELECT name, slot, version, revision, dist
+            FROM (
+                SELECT name, slot,
+                    first_value(version) OVER w AS version,
+                    first_value(revision) OVER w AS revision,
+                    first_value(distribution) OVER w AS dist,
+                    first_value(debler_version) over w AS debler
+                FROM package_versions
+                WINDOW w AS (PARTITION BY name, slot ORDER BY version, revision)
+            ) AS w
+            WHERE debler < %s;""", (list(self.current_debler_version), ))
+        for name, slot, version, revision, dist in c:
+            self.create_gem_version(
+                name, slot,
+                version=version, revision=revision + 1,
+                changelog=changelog, distribution=dist)
