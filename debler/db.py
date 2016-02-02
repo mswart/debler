@@ -76,13 +76,13 @@ class Database():
         c = self.conn.cursor()
         c.execute("""SELECT name, slot, version, revision, dist
             FROM (
-                SELECT name, slot,
+                SELECT DISTINCT name, slot,
                     first_value(version) OVER w AS version,
                     first_value(revision) OVER w AS revision,
                     first_value(distribution) OVER w AS dist,
                     first_value(debler_version) over w AS debler
                 FROM package_versions
-                WINDOW w AS (PARTITION BY name, slot ORDER BY version, revision)
+                WINDOW w AS (PARTITION BY name, slot ORDER BY version DESC, revision DESC)
             ) AS w
             WHERE debler < %s;""", (list(self.current_debler_version), ))
         for name, slot, version, revision, dist in c:
