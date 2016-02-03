@@ -8,6 +8,8 @@ from dateutil.tz import tzlocal
 class Database():
     current_debler_version = [1, 2]
 
+    rubies = ('2.2', '2.1')
+
     def __init__(self):
         self.conn = psycopg2.connect('dbname=debler')
 
@@ -29,14 +31,14 @@ class Database():
 
     def gem_info(self, name):
         c = self.conn.cursor()
-        c.execute('SELECT level, builddeps FROM gems WHERE name = %s', (name, ))
-        level, builddeps = c.fetchone()
+        c.execute('SELECT level, builddeps, native FROM gems WHERE name = %s', (name, ))
+        level, builddeps, native = c.fetchone()
         builddeps = json.loads(builddeps)
         slots = []
         c.execute('SELECT slot FROM packages WHERE name = %s', (name, ))
         for slot in c:
             slots.append(tuple(slot[0]))
-        return level, builddeps, slots
+        return level, builddeps, native, slots
 
     def scheduled_builds(self):
         c = self.conn.cursor()

@@ -5,7 +5,8 @@ DROP TABLE IF EXISTS gems;
 CREATE TABLE gems (
   name VARCHAR(60) UNIQUE PRIMARY KEY,
   level INT NOT NULL DEFAULT 1,
-  builddeps JSON NOT NULL DEFAULT '{}'
+  builddeps JSON NOT NULL DEFAULT '{}',
+  native boolean NOT NULL default false
 );
 
 CREATE TABLE packages (
