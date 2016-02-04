@@ -4,15 +4,15 @@ import os.path
 
 sys.path.insert(0, os.path.realpath(os.path.join(__file__, '..', '..')))
 
-from debler import gem2dsc
-import debler.db
+from debler.builder import GemBuilder, publish
+from debler.db import Database
 
-db = debler.db.Database()
+db = Database()
 
 for data in db.scheduled_builds():
     try:
         db.update_build(*data, state='generating')
-        conv = gem2dsc.Converter(db, *data)
+        conv = GemBuilder(db, *data)
         conv.create_dirs()
         conv.fetch_source()
         conv.build_orig_tar()
@@ -26,4 +26,4 @@ for data in db.scheduled_builds():
     #finally:
         #break
 
-gem2dsc.publish()
+publish()
