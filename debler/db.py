@@ -8,19 +8,21 @@ from dateutil.tz import tzlocal
 class Database():
     current_debler_version = [1, 2]
 
+    rubygems = 'https://rubygems.org'
+
     rubies = ('2.2', '2.1')
 
     def __init__(self):
         self.conn = psycopg2.connect('dbname=debler')
 
-    def register_gem(self, name, level, builddeps=None):
+    def register_gem(self, name, level, builddeps=None, native=False):
         if builddeps is None:
             builddeps = '{}'
         else:
             builddeps = '{"default": ["%s"]}' % builddeps
         c = self.conn.cursor()
-        c.execute("""INSERT INTO gems (name, level, builddeps)
-             VALUES (%s, %s, %s);""", (name, level, builddeps))
+        c.execute("""INSERT INTO gems (name, level, builddeps, native)
+             VALUES (%s, %s, %s, %s);""", (name, level, builddeps, native))
         self.conn.commit()
 
     def create_gem_slot(self, name, slot):
@@ -32,7 +34,20 @@ class Database():
     def gem_info(self, name):
         c = self.conn.cursor()
         c.execute('SELECT level, builddeps, native FROM gems WHERE name = %s', (name, ))
-        level, builddeps, native = c.fetchone()
+        result = c.fetchone()
+        if result is None:
+            print('Configure {}:'.format(name))
+            from urllib.request import urlopen
+            url = '{}/api/v1/versions/{}.json'.format(self.rubygems, name)
+            data = urlopen(url).read()
+            versions = json.loads(data.decode('utf-8'))
+            for version in versions:
+                print(version['number'] + ' ' + version['created_at'])
+            level = int(input('Level (1): ') or '1')
+            native = {'t': True, 'f': False, 'n': False, 'y': True, '': False}[input('Native?: ')]
+            self.register_gem(name, level, native=native)
+            return self.gem_info(name)
+        level, builddeps, native = result
         builddeps = json.loads(builddeps)
         slots = []
         c.execute('SELECT slot FROM packages WHERE name = %s', (name, ))
