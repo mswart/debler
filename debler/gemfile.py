@@ -34,13 +34,17 @@ class Parser():
     def parse_DEPENDENCIES(self, lines):
         self.dependencies = {}
         for line in lines:
-            assert line[-1] != '!'
+            if line[-1] == '!':
+                continue
             if '(' not in line:
                 self.dependencies[line.strip()] = []
                 continue
             name, const = line[2:].split(' ', 1)
             const = const[1:-1].split(', ')
             self.dependencies[name] = const
+
+    def parse_PATH(self, lines):
+        pass
 
 if __name__ == '__main__':
     import sys
