@@ -223,7 +223,7 @@ class GemBuilder(BaseBuilder):
         control['Section'] = 'ruby'
         control['Homepage'] = self.metadata['homepage']
         control['Description'] = self.metadata['summary']
-        control['Description'] += ('\n' + self.metadata['description']).replace('\n\n', '\n.\n').replace('\n', '\n ')
+        control['Description'] += ('\n' + (self.metadata['description'] or '')).replace('\n\n', '\n.\n').replace('\n', '\n ')
 
         control_file.write(b'\n')
         control.dump(control_file)
