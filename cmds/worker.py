@@ -22,7 +22,8 @@ for data in db.scheduled_builds():
         db.update_build(*data, state='finished')
     except Exception as e:
         db.update_build(*data, state='failed')
-        print(e)
+        raise
+
     #finally:
         #break
 
