@@ -197,6 +197,8 @@ class GemBuilder(BaseBuilder):
                     if req_level > 0:
                         req += '-' + '.'.join(up[:req_level])
                     deps.append('{} (>= {})'.format(req, version[1]['version']))
+                    if len(up) < 2:
+                        continue
                     up[-1] = '0'
                     up[-2] = str(int(up[-2]) + 1)
                     deps.append('{} (<= {})'.format(req, '.'.join(up)))
