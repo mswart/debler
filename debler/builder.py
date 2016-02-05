@@ -159,7 +159,7 @@ class GemBuilder(BaseBuilder):
 
         level, builddeps, _, _ = self.db.gem_info(self.gem_name)
         if builddeps:
-            build_deps.extend(builddeps['default']['builddeps'])
+            build_deps.extend(builddeps['default'])
         control_file = open(self.debian_file('control'), 'wb')
 
         dsc = Dsc()
@@ -256,7 +256,7 @@ class GemBuilder(BaseBuilder):
         rules['build'] = []
         rules['install'] = []
         if len(self.metadata['extensions']) == 1:
-            rules['build'].append(' v'.join(['mkdir'] + self.db.rubies))
+            rules['build'].append(' v'.join(['mkdir'] + list(self.db.rubies)))
             for ruby in self.db.rubies:
                 rules['build'].append('cd v{v} && ruby{v} ../src/{}'.format(self.metadata['extensions'][0], v=ruby))
             for ruby in self.db.rubies:
