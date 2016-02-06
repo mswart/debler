@@ -4,6 +4,8 @@ import psycopg2
 from datetime import datetime
 from dateutil.tz import tzlocal
 
+from debler.gem import GemVersion
+
 
 class Database():
     current_debler_version = [1, 2]
@@ -86,8 +88,8 @@ class Database():
             FROM package_versions
             WHERE name=%s and slot = %s
             ORDER BY version ASC, revision ASC;""", (name, list(slot)))
-        for entry in c:
-            yield entry
+        for version, revision, scheduled_at, changelog, distribution in c:
+            yield (GemVersion(version), revision, scheduled_at, changelog, distribution)
 
     def debler_format_rebuild(self, changelog):
         c = self.conn.cursor()

@@ -4,8 +4,9 @@ import os.path
 
 sys.path.insert(0, os.path.realpath(os.path.join(__file__, '..', '..')))
 
-from debler.builder import GemBuilder, publish
 from debler.db import Database
+from debler.gem import GemBuilder
+from debler.builder import publish
 
 db = Database()
 
