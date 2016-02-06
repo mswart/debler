@@ -35,7 +35,7 @@ class Database():
 
     def gem_info(self, name):
         c = self.conn.cursor()
-        c.execute('SELECT level, builddeps, native FROM gems WHERE name = %s', (name, ))
+        c.execute('SELECT level, opts, native FROM gems WHERE name = %s', (name, ))
         result = c.fetchone()
         if result is None:
             print('Configure {}:'.format(name))
@@ -49,13 +49,13 @@ class Database():
             native = {'t': True, 'f': False, 'n': False, 'y': True, '': False}[input('Native?: ')]
             self.register_gem(name, level, native=native)
             return self.gem_info(name)
-        level, builddeps, native = result
-        builddeps = json.loads(builddeps)
+        level, opts, native = result
+        opts = json.loads(opts)
         slots = []
         c.execute('SELECT slot FROM packages WHERE name = %s', (name, ))
         for slot in c:
             slots.append(tuple(slot[0]))
-        return level, builddeps, native, slots
+        return level, opts, native, slots
 
     def scheduled_builds(self):
         c = self.conn.cursor()

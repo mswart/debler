@@ -39,11 +39,13 @@ class GemVersion():
             elif part == -9:
                 s += 'beta'
                 needdot = False
-        print(self.parts, s)
         return s
 
     def todb(self):
         return self.parts
+
+    def limit(self, l):
+        return GemVersion(self.parts[:l])
 
 
 class GemInfo():
@@ -134,14 +136,14 @@ class GemBuilder(BaseBuilder):
         build_deps = [
             'debhelper',
         ]
-        if len(self.metadata['extensions']) > 0:
+        exts = self.extension_list()
+        if len(exts) > 0:
             for ruby in self.db.rubies:
                 build_deps.append('ruby{}'.format(ruby))
                 build_deps.append('ruby{}-dev'.format(ruby))
 
-        level, builddeps, _, _ = self.db.gem_info(self.gem_name)
-        if builddeps:
-            build_deps.extend(builddeps['default'])
+        level, opts, _, _ = self.db.gem_info(self.gem_name)
+        build_deps.extend(opts.get('default', {}).get('builddeps', []))
         control_file = open(self.debian_file('control'), 'wb')
 
         dsc = Dsc()
@@ -160,16 +162,16 @@ class GemBuilder(BaseBuilder):
             priovide = []
             priovide.append(self.gemnam2deb(self.gem_name))
             for l in range(1, level):
-                priovide.append(self.gemnam2deb(self.gem_name + '-' + '.'.join([str(v) for v in self.gem_version[:l]])))
+                priovide.append(self.gemnam2deb(self.gem_name + '-' + str(self.gem_version.limit(l))))
             control['Provides'] = ', '.join(priovide)
         control['Architecture'] = 'all'
         deps = []
         for dep in self.metadata['dependencies']:
             if dep['type'] != ':runtime':
                 continue
-            req = self.gemnam2deb(dep['name'])
             versioned_deps = False
             for version in dep['version_requirements']['requirements']:
+                req = self.gemnam2deb(dep['name'])
                 if version[0] == '>=' and version[1]['version'] == '0':
                     continue
                 req_level, _, _, slots = self.db.gem_info(dep['name'])
@@ -181,6 +183,7 @@ class GemBuilder(BaseBuilder):
                     deps.append('{} (>= {})'.format(req, version[1]['version']))
                     if len(up) < 2:
                         continue
+                    # TODO: skip if we leave our current slot
                     up[-1] = '0'
                     up[-2] = str(int(up[-2]) + 1)
                     deps.append('{} (<= {})'.format(req, '.'.join(up)))
@@ -198,7 +201,7 @@ class GemBuilder(BaseBuilder):
                 deps.append(req)
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')
-        if len(self.metadata['extensions']) > 0:
+        if len(exts) > 0:
             deps.append(' | '.join(['{}-ruby{} (= ${{binary:Version}})'.format(self.deb_name, ruby) for ruby in self.db.rubies]))
 
         control['Depends'] = ', '.join(deps)
@@ -210,7 +213,7 @@ class GemBuilder(BaseBuilder):
         control_file.write(b'\n')
         control.dump(control_file)
 
-        if len(self.metadata['extensions']) > 0:
+        if len(exts) > 0:
             for ruby in self.db.rubies:
                 control = Deb822()
                 control['Package'] = self.deb_name + '-ruby' + ruby
@@ -239,10 +242,13 @@ class GemBuilder(BaseBuilder):
         rules = {}
         rules['build'] = []
         rules['install'] = []
-        if len(self.metadata['extensions']) == 1:
+        exts = self.extension_list()
+        _, opts, _, _ = self.db.gem_info(self.gem_name)
+        ext_args = opts.get("default", {}).get('ext_args', '')
+        if len(exts) == 1:
             rules['build'].append(' v'.join(['mkdir'] + list(self.db.rubies)))
             for ruby in self.db.rubies:
-                rules['build'].append('cd v{v} && ruby{v} ../src/{}'.format(self.metadata['extensions'][0], v=ruby))
+                rules['build'].append('cd v{v} && ruby{v} ../src/{} {}'.format(exts[0], ext_args, v=ruby))
             for ruby in self.db.rubies:
                 rules['build'].append('make -C v{v}'.format(v=ruby))
             for ruby in self.db.rubies:
@@ -253,19 +259,17 @@ class GemBuilder(BaseBuilder):
                     '/usr/lib/${{DEB_BUILD_MULTIARCH}}/rubygems-debler/{v}.0/{name}/']).format(
                         v=ruby, name=self.own_name, package=self.deb_name + '-ruby' + ruby))
 
-        elif len(self.metadata['extensions']) > 1:
+        elif len(exts) > 1:
             rules['build'].append(' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in self.metadata['extensions'] for ruby in self.db.rubies]))
-            for ext in self.metadata['extensions']:
+            for ext in exts:
                 for ruby in self.db.rubies:
-                    rules['build'].append('cd v{v}/{ext} && ruby{v} ../../src/{}'.format(
-                        ext, ext=ext.replace('/', '_'), v=ruby))
-            for ext in self.metadata['extensions']:
+                    rules['build'].append('cd v{v}/{ext} && ruby{v} ../../src/{} {}'.format(
+                        ext, ext_args, ext=ext.replace('/', '_'), v=ruby))
+            for ext in exts:
                 for ruby in self.db.rubies:
                     rules['build'].append('make -C v{v}/{ext}'.format(
                         ext=ext.replace('/', '_'), v=ruby))
-            rules['install'].append('find')
-            rules['install'].append('cat ./v2.2/ext_json_extconf.rb/Makefile')
-            for ext in self.metadata['extensions']:
+            for ext in exts:
                 for ruby in self.db.rubies:
                     rules['install'].append(' '.join([
                         'dh_install',
@@ -295,3 +299,10 @@ class GemBuilder(BaseBuilder):
                         name=self.own_name,
                         file=member.name,
                         dir=os.path.dirname(member.name)))
+
+    def extension_list(self):
+        _, opts, _, _ = self.db.gem_info(self.gem_name)
+        exts = list(self.metadata['extensions'])
+        for ext in opts.get('default', {}).get('skip_exts', []):
+            exts.remove(ext)
+        return exts
