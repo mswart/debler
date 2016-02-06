@@ -7,6 +7,8 @@ import subprocess
 from debian.deb822 import Deb822, Dsc
 from debian.changelog import Changelog
 
+from debler import config
+
 
 def construct_ruby_object(loader, suffix, node):
     return loader.construct_yaml_map(node)
@@ -15,8 +17,6 @@ yaml.add_multi_constructor(u"!ruby/object:", construct_ruby_object)
 
 
 class BaseBuilder():
-    WORKDIR = os.path.realpath(os.path.join(__file__, '..', '..', 'work'))
-
     @staticmethod
     def gemnam2deb(name):
         return 'debler-rubygem-' + name.replace('_', '--')
@@ -61,8 +61,8 @@ Licence: See LICENCE file
 
         subprocess.check_call(['sbuild',
                                '--dist', 'trusty',
-                               '--keyid', '0xDAE2696E26F4ADC4',
-                               '--maintainer', 'Debler Automatic Rubygems Packager <debler@dxtt.de>',
+                               '--keyid', config.keyid,
+                               '--maintainer', config.maintainer,
                                '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
 
 
@@ -94,13 +94,13 @@ class GemBuilder(BaseBuilder):
 
     @property
     def src_file(self):
-        return os.path.join(self.WORKDIR, self.gem_name, self.gem_version_s, 'orig.gem')
+        return os.path.join(config.workdir, self.gem_name, self.gem_version_s, 'orig.gem')
 
     def fetch_source(self):
         if not os.path.isfile(self.src_file):
             subprocess.check_call(['wget',
-                                   'https://rubygems.org/downloads/{}-{}.gem'
-                                  .format(self.gem_name, self.gem_version_s),
+                                   '{}/downloads/{}-{}.gem'
+                                  .format(config.rubygems, self.gem_name, self.gem_version_s),
                                    '-O', self.src_file])
 
     @property
@@ -112,7 +112,7 @@ class GemBuilder(BaseBuilder):
     @property
     def slot_dir(self):
         return os.path.join(
-            self.WORKDIR,
+            config.workdir,
             self.gem_name,
             'slot' + self.gem_slot_s)
 
@@ -165,7 +165,7 @@ class GemBuilder(BaseBuilder):
         dsc = Dsc()
         dsc['Source'] = self.deb_name
         dsc['Priority'] = 'optional'
-        dsc['Maintainer'] = 'Debler Automatic Rubygems Packager <debler@dxtt.de>'
+        dsc['Maintainer'] = config.maintainer
         dsc['Homepage'] = self.metadata['homepage']
         dsc['Standards-Version'] = '3.9.6'
         dsc['Build-Depends'] = ', '.join(build_deps)
@@ -247,7 +247,7 @@ class GemBuilder(BaseBuilder):
             deb_version = '.'.join([str(v) for v in version]) + '-' + str(revision)
             changes.new_block(package=self.deb_name, version=deb_version,
                               distributions=distribution, urgency='low',
-                              author='Debler Automatic Rubygems Packager <debler@dxtt.de>',
+                              author=config.maintainer,
                               date=scheduled_at.strftime('%a, %d %b %Y %H:%M:%S %z'))
             changes.add_change('\n  * ' + change + '\n')
         with open(self.debian_file('changelog'), 'w') as f:
@@ -314,10 +314,10 @@ class GemBuilder(BaseBuilder):
 
 
 def publish():
-    os.chdir(BaseBuilder.WORKDIR)
+    os.chdir(config.workdir)
     subprocess.check_call(['apt-ftparchive', 'packages', '.'], stdout=open('Packages', 'wb'))
     subprocess.check_call(['apt-ftparchive', 'release', '.'], stdout=open('Release', 'wb'))
-    subprocess.check_call(['gpg', '--clearsign', '-u', '0xDAE2696E26F4ADC4', '-o', 'InRelease.new', 'Release'])
-    subprocess.check_call(['gpg', '-abs', '-u', '0xDAE2696E26F4ADC4', '-o', 'Release.gpg.new', 'Release'])
+    subprocess.check_call(['gpg', '--clearsign', '-u', config.keyid, '-o', 'InRelease.new', 'Release'])
+    subprocess.check_call(['gpg', '-abs', '-u', config.keyid, '-o', 'Release.gpg.new', 'Release'])
     os.rename('InRelease.new', 'InRelease')
     os.rename('Release.gpg.new', 'Release.gpg')

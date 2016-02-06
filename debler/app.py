@@ -10,6 +10,7 @@ from debian.deb822 import Deb822, Dsc
 
 from debler.gemfile import Parser as GemfileParser
 from debler.builder import BaseBuilder
+from debler import config
 
 
 class AppInfo():
@@ -77,7 +78,7 @@ class AppBuilder(BaseBuilder):
     @property
     def slot_dir(self):
         return os.path.join(
-            self.WORKDIR,
+            config.workdir,
             'apps',
             self.app.name)
 
@@ -94,7 +95,7 @@ class AppBuilder(BaseBuilder):
             change = 'Build with debler'
         changes.new_block(package=self.deb_name, version=deb_version,
                           distributions='trusty', urgency='low',
-                          author='Debler Automatic Rubygems Packager <debler@dxtt.de>',
+                          author=config.maintainer,
                           date=datetime.now(tz=tzlocal()).strftime('%a, %d %b %Y %H:%M:%S %z'))
         self.deb_version = deb_version
         changes.add_change('\n  * ' + change + '\n')
@@ -110,7 +111,7 @@ class AppBuilder(BaseBuilder):
         dsc = Dsc()
         dsc['Source'] = self.deb_name
         dsc['Priority'] = 'optional'
-        dsc['Maintainer'] = 'Debler Automatic Rubygems Packager <debler@dxtt.de>'
+        dsc['Maintainer'] = config.maintainer
         dsc['Homepage'] = self.app.homepage
         dsc['Standards-Version'] = '3.9.6'
         dsc['Build-Depends'] = ', '.join(build_deps)
