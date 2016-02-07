@@ -26,6 +26,16 @@ class GemVersion():
     def __init__(self, parts):
         self.parts = parts
 
+    @classmethod
+    def fromstr(cls, s):
+        parts = []
+        for part in s.split('.'):
+            if part.startswith('beta'):
+                parts.append(-9)
+                part = part[4:]
+            parts.append(int(part))
+        return cls(parts)
+
     def __str__(self):
         s = ''
         needdot = False

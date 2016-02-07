@@ -1,3 +1,6 @@
+from debler.gem import GemVersion
+
+
 class Parser():
     def __init__(self, file):
         self.parse(file)
@@ -26,7 +29,7 @@ class Parser():
                 continue
             name, version = line.strip().split(' ', 1)
             version = version[1:-1]
-            self.gems[name] = version
+            self.gems[name] = GemVersion.fromstr(version)
 
     def parse_PLATFORMS(self, lines):
         assert lines[0].strip() == 'ruby'

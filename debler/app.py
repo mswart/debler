@@ -43,9 +43,8 @@ class AppInfo():
 
     def schedule_gemdeps_builds(self):
         for dep, version in self.gems.items():
-            version = [int(v) for v in version.split('.')]
             level, builddeps, native, slots = self.db.gem_info(dep)
-            slot = tuple(version[:level])
+            slot = tuple(version.limit(level).todb())
             if slot not in slots:
                 self.db.create_gem_slot(dep, slot)
                 self.db.create_gem_version(
@@ -126,9 +125,8 @@ class AppBuilder(BaseBuilder):
         deps = []
         natives = []
         for dep, version in self.app.gems.items():
-            version = [int(v) for v in version.split('.')]
             level, builddeps, native, slots = self.db.gem_info(dep)
-            slot = tuple(version[:level])
+            slot = tuple(version.limit(level).todb())
             gem_slot_name = dep + '-' + '.'.join([str(s) for s in slot])
             deb_dep = self.gemnam2deb(gem_slot_name)
             self.load_paths['all'].append('/usr/share/rubygems-debler/{name}/{}/'.format('lib', name=gem_slot_name))
