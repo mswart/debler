@@ -8,4 +8,12 @@ import debler.db
 
 db = debler.db.Database()
 
-db.debler_format_rebuild(sys.argv[1])
+msg = sys.argv[1]
+
+gems = sys.argv[2:]
+
+if gems:
+    for gem in gems:
+        db.gem_rebuild(gem, msg)
+else:
+    db.debler_format_rebuild(sys.argv[1])

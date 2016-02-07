@@ -109,3 +109,21 @@ class Database():
                 name, slot,
                 version=version, revision=revision + 1,
                 changelog=changelog, distribution=dist)
+
+    def gem_rebuild(self, name, message):
+        c = self.conn.cursor()
+        c.execute("""SELECT name, slot, version, revision, dist
+            FROM (
+                SELECT DISTINCT name, slot,
+                    first_value(version) OVER w AS version,
+                    first_value(revision) OVER w AS revision,
+                    first_value(distribution) OVER w AS dist
+                FROM package_versions
+                WINDOW w AS (PARTITION BY name, slot ORDER BY version DESC, revision DESC)
+            ) AS w
+            WHERE name = %s""", (name, ))
+        for name, slot, version, revision, dist in c:
+            self.create_gem_version(
+                name, slot,
+                version=version, revision=revision + 1,
+                changelog=message, distribution=dist)
