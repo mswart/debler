@@ -179,17 +179,23 @@ class GemBuilder(BaseBuilder):
         for dep in self.metadata['dependencies']:
             if dep['type'] != ':runtime':
                 continue
+            if dep['name'] == 'bundler':
+                continue
             versioned_deps = False
             for version in dep['version_requirements']['requirements']:
                 req = self.gemnam2deb(dep['name'])
                 if version[0] == '>=' and version[1]['version'] == '0':
                     continue
                 req_level, _, _, slots = self.db.gem_info(dep['name'])
+                if not slots:
+                    continue
+                if version[0] != '=' and '.rc' in version[1]['version']:
+                    version[1]['version'] = version[1]['version'][:version[1]['version'].find('.rc')]
                 if version[0] == '~>':
                     versioned_deps = True
                     up = version[1]['version'].split('.')
                     if req_level > 0:
-                        req += '-' + '.'.join(up[:req_level])
+                        req += '-' + '.'.join(str(v) for v in slots[0][:req_level])
                     deps.append('{} (>= {})'.format(req, version[1]['version']))
                     if len(up) < 2:
                         continue
@@ -198,6 +204,12 @@ class GemBuilder(BaseBuilder):
                     up[-2] = str(int(up[-2]) + 1)
                     deps.append('{} (<= {})'.format(req, '.'.join(up)))
                 else:
+                    if version[0] == '<=':
+                        up = version[1]['version'].split('.')
+                        up[-1] = str(int(up[-1]) + 1)
+                        v = '.'.join(up)
+                    else:
+                        v = version[1]['version']
                     versioned_deps = True
                     tmp = []
                     for slot in slots:
@@ -205,7 +217,7 @@ class GemBuilder(BaseBuilder):
                             slot = '-' + '.'.join([str(s) for s in slot])
                         else:
                             slot = ''
-                        tmp.append('{} (>= {})'.format(req + slot, version[1]['version']))
+                        tmp.append('{} ({} {})'.format(req + slot, {'>': '>=', '=': '>='}.get(version[0], version[0]), v))
                     deps.append(' | '.join(tmp))
             if not versioned_deps:
                 deps.append(req)

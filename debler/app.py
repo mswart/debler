@@ -144,7 +144,7 @@ class AppBuilder(BaseBuilder):
                             up[-2] = str(int(up[-2]) + 1)
                             deps.append('{} (<= {})'.format(deb_dep, '.'.join(up)))
                     else:
-                        deps.append('{} ({} {})'.format(deb_dep, op, vers))
+                        deps.append('{} ({} {})'.format(deb_dep, {'=': '>=', '>': '>='}.get(op, op), vers))
             else:
                 deps.append(deb_dep)
         deps.append(' | '.join([self.deb_name + '-ruby' + ruby for ruby in self.db.rubies]))
