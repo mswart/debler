@@ -354,7 +354,7 @@ Gem::Specification.new do |s|
             with tarfile.open(self.src_file) as t, tarfile.open(fileobj=t.extractfile('data.tar.gz')) as dt:
                 members = dt.getmembers()
                 for member in members:
-                    for path in self.metadata['require_paths'] + ['data']:
+                    for path in self.metadata['require_paths'] + [self.metadata['bindir'], 'data']:
                         if member.name.startswith(path):
                             break
                     else:
