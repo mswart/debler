@@ -81,8 +81,7 @@ class AppBuilder(BaseBuilder):
     @property
     def slot_dir(self):
         return os.path.join(
-            config.workdir,
-            'apps',
+            config.appdir,
             self.app.name)
 
     def generate_changelog_file(self):

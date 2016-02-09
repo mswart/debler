@@ -55,8 +55,8 @@ Licence: See LICENCE file
                                '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
 
 
-def publish():
-    os.chdir(config.workdir)
+def publish(dir):
+    os.chdir(getattr(config, dir + 'dir'))
     subprocess.check_call(['apt-ftparchive', 'packages', '.'], stdout=open('Packages', 'wb'))
     subprocess.check_call(['apt-ftparchive', 'release', '.'], stdout=open('Release', 'wb'))
     subprocess.check_call(['gpg', '--clearsign', '-u', config.keyid, '-o', 'InRelease.new', 'Release'])

@@ -19,4 +19,4 @@ builder.build_orig_tar()
 builder.gen_debian_files()
 builder.build()
 
-publish()
+publish('app')

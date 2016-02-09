@@ -28,4 +28,4 @@ for data in db.scheduled_builds():
     #finally:
         #break
 
-publish()
+publish('gem')

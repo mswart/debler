@@ -88,7 +88,7 @@ class GemBuilder(BaseBuilder):
 
     @property
     def src_file(self):
-        return os.path.join(config.workdir, self.gem_name, str(self.gem_version), 'orig.gem')
+        return os.path.join(config.gemdir, self.gem_name, str(self.gem_version), 'orig.gem')
 
     def fetch_source(self):
         if not os.path.isfile(self.src_file):
@@ -106,7 +106,7 @@ class GemBuilder(BaseBuilder):
     @property
     def slot_dir(self):
         return os.path.join(
-            config.workdir,
+            config.gemdir,
             self.gem_name,
             'slot' + str(self.gem_slot))
 
