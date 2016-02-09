@@ -15,7 +15,8 @@ from debler import config
 
 class AppInfo():
     def __init__(self, db, name, version, basedir, *, gemfile=None,
-                 homepage=None, description=None, executables=[]):
+                 homepage=None, description=None, executables=[], dirs=[],
+                 bundler_laucher=False, files=[]):
         self.db = db
         self.name = name
         if type(version) is list:
@@ -33,6 +34,9 @@ class AppInfo():
         self.homepage = homepage
         self.description = description
         self.executables = executables
+        self.dirs = dirs
+        self.files = files
+        self.bundler_laucher = bundler_laucher
 
     @classmethod
     def fromyml(cls, db, filename):
@@ -122,12 +126,17 @@ class AppBuilder(BaseBuilder):
         control['Architecture'] = 'all'
         self.load_paths = {'all': []}
         self.installs = {'all': []}
+        self.symlinks = {'all': []}
         deps = []
         natives = []
         for dep, version in self.app.gems.items():
             level, builddeps, native, slots = self.db.gem_info(dep)
             slot = tuple(version.limit(level).todb())
             gem_slot_name = dep + '-' + '.'.join([str(s) for s in slot])
+            self.symlinks['all'].append((
+                '/usr/share/rubygems-debler/{}/{}.gemspec'.format(gem_slot_name, dep),
+                '/usr/share/{}/.debler/gems/specifications/{}-{}.gemspec'.format(self.app.name, dep, str(version))
+            ))
             deb_dep = self.gemnam2deb(gem_slot_name)
             self.load_paths['all'].append('/usr/share/rubygems-debler/{name}/{}/'.format('lib', name=gem_slot_name))
             if native:
@@ -184,10 +193,15 @@ class AppBuilder(BaseBuilder):
         with open(self.debian_file('rules'), 'w') as f:
             f.write("#!/usr/bin/make -f\n%:\n\tdh $@\n")
 
+        for dir in self.app.dirs:
+            self.installs['all'].append((dir, '/usr/share/{}\n'.format(self.app.name)))
+        for file in self.app.files:
+            self.installs['all'].append((file, '/usr/share/{}\n'.format(self.app.name)))
+
         os.makedirs(self.debian_file('data'), exist_ok=True)
         os.makedirs(self.debian_file('bin'), exist_ok=True)
         for version, paths in self.load_paths.items():
-            self.installs[version].append((os.path.join('debian', 'data', version), '/usr/share/{}/.load_paths/'.format(self.app.name)))
+            self.installs[version].append((os.path.join('debian', 'data', version), '/usr/share/{}/.debler/load_paths/'.format(self.app.name)))
             with open(self.debian_file('data', version), 'w') as f:
                 f.write('\n'.join(paths) + '\n')
 
@@ -196,15 +210,31 @@ class AppBuilder(BaseBuilder):
             for ruby in self.db.rubies:
                 with open(self.debian_file('bin', os.path.basename(executable) + ruby), 'w') as f:
                     f.write('#!/usr/bin/ruby{}\n'.format(ruby))
-                    f.write('File.readlines("/usr/share/{}/.load_paths/all").each do |dir|\n'.format(self.app.name))
+                    f.write('File.readlines("/usr/share/{}/.debler/load_paths/all").each do |dir|\n'.format(self.app.name))
                     f.write('  $LOAD_PATH << dir.strip\n')
                     f.write('end\n')
-                    f.write('File.readlines("/usr/share/{}/.load_paths/{}.0").each do |dir|\n'.format(self.app.name, ruby))
+                    f.write('File.readlines("/usr/share/{}/.debler/load_paths/{}.0").each do |dir|\n'.format(self.app.name, ruby))
                     f.write('  $LOAD_PATH << dir.strip\n')
                     f.write('end\n')
                     f.write('load "/usr/share/{}/{}"\n'.format(self.app.name, executable))
                 self.installs[ruby + '.0'].append((os.path.join('debian', 'bin', os.path.basename(executable) + ruby), '/usr/bin'))
                 os.chmod(self.debian_file('bin', os.path.basename(executable) + ruby), 0o755)
+
+        if self.app.bundler_laucher:
+            for ruby in self.db.rubies:
+                with open(self.debian_file('bin', self.app.name + ruby), 'w') as f:
+                    f.write('#!/usr/bin/ruby{}\n'.format(ruby))
+                    f.write('Dir.chdir("/usr/share/{}")\n'.format(self.app.name))
+                    f.write('ENV[\'HOME\'] = \'/tmp\'\n')  # will be fixed later
+                    f.write('File.readlines("/usr/share/{}/.debler/load_paths/all").each do |dir|\n'.format(self.app.name))
+                    f.write('  $LOAD_PATH << dir.strip\n')
+                    f.write('end\n')
+                    f.write('File.readlines("/usr/share/{}/.debler/load_paths/{}.0").each do |dir|\n'.format(self.app.name, ruby))
+                    f.write('  $LOAD_PATH << dir.strip\n')
+                    f.write('end\n')
+                    f.write('load ARGF.argv.shift\n')
+                self.installs[ruby + '.0'].append((os.path.join('debian', 'bin', self.app.name + ruby), '/usr/bin'))
+                os.chmod(self.debian_file('bin', self.app.name + ruby), 0o755)
 
         for version, installs in self.installs.items():
             if version == 'all':
@@ -213,6 +243,17 @@ class AppBuilder(BaseBuilder):
                 deb = self.deb_name + '-ruby' + version[:-2]
             with open(self.debian_file(deb + '.install'), 'w') as f:
                 for file, dir in installs:
+                    f.write('{} {}\n'.format(file, dir))
+
+        for version, symlinks in self.symlinks.items():
+            if not symlinks:
+                continue
+            if version == 'all':
+                deb = self.deb_name
+            else:
+                deb = self.deb_name + '-ruby' + version[:-2]
+            with open(self.debian_file(deb + '.links'), 'w') as f:
+                for file, dir in symlinks:
                     f.write('{} {}\n'.format(file, dir))
 
     def build_orig_tar(self):
