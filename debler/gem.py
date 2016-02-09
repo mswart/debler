@@ -205,7 +205,7 @@ class GemBuilder(BaseBuilder):
                     up[-2] = str(int(up[-2]) + 1)
                     deps.append('{} (<= {})'.format(req, '.'.join(up)))
                 else:
-                    if version[0] == '<=':
+                    if version[0] == '<':
                         up = version[1]['version'].split('.')
                         up[-1] = str(int(up[-1]) + 1)
                         v = '.'.join(up)
@@ -218,7 +218,7 @@ class GemBuilder(BaseBuilder):
                             slot = '-' + '.'.join([str(s) for s in slot])
                         else:
                             slot = ''
-                        tmp.append('{} ({} {})'.format(req + slot, {'>': '>=', '=': '>='}.get(version[0], version[0]), v))
+                        tmp.append('{} ({} {})'.format(req + slot, {'>': '>=', '=': '>=', '<': '<='}.get(version[0], version[0]), v))
                     deps.append(' | '.join(tmp))
             if not versioned_deps:
                 deps.append(req)
