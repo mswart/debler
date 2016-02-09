@@ -53,7 +53,7 @@ class AppInfo():
                 self.db.create_gem_slot(dep, slot)
                 self.db.create_gem_version(
                     dep, slot,
-                    version=version, revision=1,
+                    version=version.todb(), revision=1,
                     changelog='Import newly into debler', distribution='trusty')
 
     @property
