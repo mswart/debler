@@ -93,7 +93,7 @@ class GemBuilder(BaseBuilder):
     def fetch_source(self):
         if not os.path.isfile(self.src_file):
             subprocess.check_call(['wget',
-                                   '{}/downloads/{}-{}.gem'
+                                   '{}/gems/{}-{}.gem'
                                   .format(config.rubygems, self.gem_name, self.gem_version),
                                    '-O', self.src_file])
 
