@@ -8,7 +8,7 @@ from debler.gem import GemVersion
 
 
 class Database():
-    current_debler_version = [1, 2]
+    current_debler_version = [1, 3]
 
     rubygems = 'https://rubygems.org'
 
