@@ -1,3 +1,5 @@
+import lepl
+
 from debler.gem import GemVersion
 
 
@@ -13,15 +15,32 @@ class Source():
         return 'Source({})'.format(self.source)
 
 
-class Gem():
+class GemfileGem():
     def __init__(self, name, constraints, opts):
         self.name = name
         self.constraints = constraints
         self.opts = opts
-        self.opts['envs'] = ['all']
+        self.opts['envs'] = ['default']
 
     def __repr__(self):
         return 'Gem({}, {}, {})'.format(self.name, self.constraints, self.opts)
+
+
+class Gem():
+    def __init__(self, name, version, constraints, envs, require=False):
+        self.name = name
+        self.version = version
+        self.constraints = constraints
+        self.envs = envs
+        self.deps = {}
+        self.require = require
+
+    def __repr__(self):
+        v = str(self.version)
+        if self.constraints:
+            v += ' (' + ', '.join(self.constraints) + ')'
+        return 'Gem({}, v={}, require={}, envs={}, deps={})'.format(
+            self.name, v, self.require, ','.join(self.envs) or '-', self.deps)
 
 
 class Group():
@@ -34,7 +53,6 @@ class Group():
 
 
 def build_gems(envs, *gems):
-    print(envs, gems)
     for gem in gems:
         gem.opts['envs'] = envs
     return gems
@@ -51,7 +69,6 @@ def ret(v):
         return v
     return call
 
-import lepl
 string = (lepl.Drop('\'') & lepl.Star(lepl.AnyBut('\'')) & lepl.Drop('\'')) > build_str
 symbol = lepl.Drop(':') & lepl.Star(lepl.AnyBut('\':\t ')) > build_str
 
@@ -73,7 +90,7 @@ keywords = lepl.Star(~lepl.Drop(',') & ~lepl.Space() & keyword) > dict
 gem &= keywords
 # comment
 gem &= lepl.Drop(lepl.Star(lepl.Space()) & lepl.Optional(line_comment))
-gem = gem > expand(Gem)
+gem = gem > expand(GemfileGem)
 
 # gem group
 group_envs = symbol & lepl.Star(lepl.Drop(',') & ~lepl.Space() & symbol) > tuple
@@ -88,13 +105,40 @@ parser = lepl.Star(source | gem | group | newline)
 
 
 class Parser():
-    def __init__(self, file):
-        self.parse(file)
+    def __init__(self, gemfile):
+        self.gems = {}
+        self.parse_gemfile(gemfile)
+        self.parse_gemlock(gemfile + '.lock')
+        self.sorted_gems = list(self.sort_gems())
 
-    def parse(self, file):
+    def sort_gems(self):
+        loaded = set()
+        gems_yield = True
+        while gems_yield:
+            gems_yield = False
+            for gem in sorted(self.gems):
+                if gem in loaded:
+                    continue
+                if len(set(self.gems[gem].deps.keys()).difference(loaded)) == 0:
+                    loaded.add(gem)
+                    gems_yield = True
+                    yield gem
+
+    def parse_gemfile(self, file):
+        d = parser.parse(open(file, 'r'))
+        for o in d:
+            if type(o) is GemfileGem:
+                self.gems[o.name] = Gem(o.name, None, o.constraints,
+                                        o.opts['envs'], o.opts.get('require', True))
+            elif type(o) is tuple:
+                for os in o:
+                    self.gems[os.name] = Gem(os.name, None, os.constraints,
+                                             os.opts['envs'], os.opts.get('require', True))
+
+    def parse_gemlock(self, file):
         current_state = None
         current_lines = []
-        for line in file:
+        for line in open(file, 'r'):
             if not line.strip():
                 continue
             if line[0] != ' ':
@@ -109,13 +153,20 @@ class Parser():
         assert lines[0][0:10] == '  remote: '
         self.remote = lines[0][10:]
         assert lines[1][0:8] == '  specs:'
-        self.gems = {}
+        current_gem = None
         for line in lines[2:]:
             if line[4] == ' ':  # skip dependencies
+                a, b = (line.strip() + ' ').split(' ', 1)
+                current_gem.deps[a] = b[1:-2] if b else True
                 continue
             name, version = line.strip().split(' ', 1)
             version = version[1:-1]
-            self.gems[name] = GemVersion.fromstr(version)
+            if name in self.gems:
+                self.gems[name].version = GemVersion.fromstr(version)
+            else:
+                self.gems[name] = Gem(name, GemVersion.fromstr(version),
+                                      tuple(), tuple())
+            current_gem = self.gems[name]
 
     def parse_PLATFORMS(self, lines):
         assert lines[0].strip() == 'ruby'

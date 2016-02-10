@@ -24,13 +24,8 @@ class AppInfo():
         else:
             self.version = tuple(int(i) for i in str(version).split('.'))
         self.basedir = basedir
-        if gemfile is None:
-            self.gemfile = None
-            self.gemfile_lock = None
-        else:
-            self.gemfile = None
-            self.gemfile_lock = GemfileParser(open(os.path.join(self.basedir,
-                                              gemfile + '.lock')))
+        if gemfile is not None:
+            self.gemfile = GemfileParser(os.path.join(self.basedir, gemfile))
         self.homepage = homepage
         self.description = description
         self.executables = executables
