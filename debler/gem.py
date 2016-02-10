@@ -205,7 +205,7 @@ class GemBuilder(BaseBuilder):
                     up[-2] = str(int(up[-2]) + 1)
                     deps.append('{} (<= {})'.format(req, '.'.join(up)))
                 else:
-                    if version[0] == '<':
+                    if version[0] in ['<', '<=']:
                         up = version[1]['version'].split('.')
                         up[-1] = str(int(up[-1]) + 1)
                         v = '.'.join(up)
@@ -332,11 +332,11 @@ Gem::Specification.new do |s|
                 require_paths='", "'.join(self.metadata['require_paths']),
                 authors='", "'.join(self.metadata['authors']),
                 date=self.metadata['date'].strftime('%Y-%m-%d'),
-                description=self.metadata['description'],
-                email='", "'.join(self.metadata['email']),
+                description=self.metadata['description'].replace('"', '\\"'),
+                email=self.metadata['email'] if type(self.metadata['email']) is str else '", "'.join(self.metadata['email']),
                 homepage=self.metadata['homepage'],
                 licenses='", "'.join(self.metadata['licenses']),
-                summary=self.metadata['summary']))
+                summary=self.metadata['summary'].replace('"', '\\"')))
             for dep in self.metadata['dependencies']:
                 if dep['type'] != ':runtime':
                     kind = 'add_dependency'
@@ -354,7 +354,7 @@ Gem::Specification.new do |s|
             with tarfile.open(self.src_file) as t, tarfile.open(fileobj=t.extractfile('data.tar.gz')) as dt:
                 members = dt.getmembers()
                 for member in members:
-                    for path in self.metadata['require_paths'] + [self.metadata['bindir'], 'data']:
+                    for path in self.metadata['require_paths'] + [self.metadata['bindir'], 'data', 'vendor']:
                         if member.name.startswith(path):
                             break
                     else:
