@@ -16,7 +16,7 @@ from debler import config
 class AppInfo():
     def __init__(self, db, name, version, basedir, *, gemfile=None,
                  homepage=None, description=None, executables=[], dirs=[],
-                 bundler_laucher=False, files=[]):
+                 bundler_laucher=False, files=[], default_env=None):
         self.db = db
         self.name = name
         if type(version) is list:
@@ -32,6 +32,7 @@ class AppInfo():
         self.dirs = dirs
         self.files = files
         self.bundler_laucher = bundler_laucher
+        self.default_env = default_env
 
     @classmethod
     def fromyml(cls, db, filename):
@@ -41,23 +42,21 @@ class AppInfo():
         return cls(db, **data)
 
     def schedule_gemdeps_builds(self):
-        for dep, version in self.gems.items():
-            level, builddeps, native, slots = self.db.gem_info(dep)
-            slot = tuple(version.limit(level).todb())
+        for name, gem in self.gems.items():
+            if not gem.version:
+                continue
+            level, builddeps, native, slots = self.db.gem_info(name)
+            slot = tuple(gem.version.limit(level).todb())
             if slot not in slots:
-                self.db.create_gem_slot(dep, slot)
+                self.db.create_gem_slot(name, slot)
                 self.db.create_gem_version(
-                    dep, slot,
-                    version=version.todb(), revision=1,
+                    name, slot,
+                    version=gem.version.todb(), revision=1,
                     changelog='Import newly into debler', distribution='trusty')
 
     @property
     def gems(self):
-        return self.gemfile_lock.gems
-
-    @property
-    def dependencies(self):
-        return self.gemfile_lock.dependencies
+        return self.gemfile.gems
 
 
 class AppBuilder(BaseBuilder):
@@ -123,21 +122,23 @@ class AppBuilder(BaseBuilder):
         self.symlinks = {'all': []}
         deps = []
         natives = []
-        for dep, version in self.app.gems.items():
-            level, builddeps, native, slots = self.db.gem_info(dep)
-            slot = tuple(version.limit(level).todb())
-            gem_slot_name = dep + '-' + '.'.join([str(s) for s in slot])
+        for name, gem in self.app.gems.items():
+            if not gem.version:
+                continue
+            level, builddeps, native, slots = self.db.gem_info(name)
+            slot = tuple(gem.version.limit(level).todb())
+            gem_slot_name = name + '-' + '.'.join([str(s) for s in slot])
             self.symlinks['all'].append((
-                '/usr/share/rubygems-debler/{}/{}.gemspec'.format(gem_slot_name, dep),
-                '/usr/share/{}/.debler/gems/specifications/{}-{}.gemspec'.format(self.app.name, dep, str(version))
+                '/usr/share/rubygems-debler/{}/{}.gemspec'.format(gem_slot_name, name),
+                '/usr/share/{}/.debler/gems/specifications/{}-{}.gemspec'.format(self.app.name, name, str(gem.version))
             ))
             deb_dep = self.gemnam2deb(gem_slot_name)
             self.load_paths['all'].append('/usr/share/rubygems-debler/{name}/{}/'.format('lib', name=gem_slot_name))
             if native:
                 natives.append(deb_dep)
-            constraints = self.app.dependencies.get(dep, [])
-            if constraints:
-                for constraint in constraints:
+            if gem.constraints:
+                print(gem.constraints)
+                for constraint in gem.constraints:
                     op, vers = constraint.split(' ')
                     if op == '~>':
                         up = vers.split('.')
@@ -215,11 +216,16 @@ class AppBuilder(BaseBuilder):
                 os.chmod(self.debian_file('bin', os.path.basename(executable) + ruby), 0o755)
 
         if self.app.bundler_laucher:
+            os.makedirs(self.debian_file('lib/bundler'), exist_ok=True)
+
             for ruby in self.db.rubies:
                 with open(self.debian_file('bin', self.app.name + ruby), 'w') as f:
                     f.write('#!/usr/bin/ruby{}\n'.format(ruby))
                     f.write('Dir.chdir("/usr/share/{}")\n'.format(self.app.name))
                     f.write('ENV[\'HOME\'] = \'/tmp\'\n')  # will be fixed later
+                    f.write('ENV[\'RAILS_ENV\'] = \'{}\'\n'.format(self.app.default_env))
+                    f.write('ENV[\'GEM_PATH\'] = \'/usr/share/{}/.debler/gems\'\n'.format(self.app.name))
+                    f.write('$LOAD_PATH << \'/usr/share/{}/.debler/lib\'\n'.format(self.app.name))
                     f.write('File.readlines("/usr/share/{}/.debler/load_paths/all").each do |dir|\n'.format(self.app.name))
                     f.write('  $LOAD_PATH << dir.strip\n')
                     f.write('end\n')
@@ -229,6 +235,25 @@ class AppBuilder(BaseBuilder):
                     f.write('load ARGF.argv.shift\n')
                 self.installs[ruby + '.0'].append((os.path.join('debian', 'bin', self.app.name + ruby), '/usr/bin'))
                 os.chmod(self.debian_file('bin', self.app.name + ruby), 0o755)
+
+            self.installs['all'].append((os.path.join('debian', 'lib'), '/usr/share/{}/.debler'.format(self.app.name)))
+            with open(self.debian_file('lib', 'bundler', 'setup.rb'), 'w') as f:
+                f.write('require "bundler"\n')
+
+            with open(self.debian_file('lib', 'bundler.rb'), 'w') as f:
+                f.write('class Bundler\n')
+                f.write('  def self.require(*groups)\n')
+
+                for name in self.app.gemfile.sorted_gems:
+                    gem = self.app.gemfile.gems[name]
+                    if not gem.require:
+                        continue
+                    if 'default' in gem.envs:
+                        f.write('  Kernel.require "{}"\n'.format(name))
+                    else:
+                        f.write('  Kernel.require "{}" unless (groups & ["{}"]).empty?\n'.format(name, '", "'.join(gem.envs)))
+                f.write('  end\n')
+                f.write('end\n')
 
         for version, installs in self.installs.items():
             if version == 'all':
