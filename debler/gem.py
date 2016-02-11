@@ -332,13 +332,13 @@ Gem::Specification.new do |s|
                 require_paths='", "'.join(self.metadata['require_paths']),
                 authors='", "'.join(self.metadata['authors']),
                 date=self.metadata['date'].strftime('%Y-%m-%d'),
-                description=self.metadata['description'].replace('"', '\\"'),
+                description=(self.metadata.get('description', '') or '').replace('"', '\\"'),
                 email=self.metadata['email'] if type(self.metadata['email']) is str else '", "'.join(self.metadata['email']),
                 homepage=self.metadata['homepage'],
                 licenses='", "'.join(self.metadata['licenses']),
-                summary=self.metadata['summary'].replace('"', '\\"')))
+                summary=self.metadata.get('summary', '').replace('"', '\\"')))
             for dep in self.metadata['dependencies']:
-                if dep['type'] != ':runtime':
+                if dep['type'] == ':runtime':
                     kind = 'add_dependency'
                 else:
                     kind = 'add_development_dependency'
