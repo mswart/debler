@@ -1,9 +1,11 @@
-#!/usr/bin/env python3
-import sys
-import os.path
-
-sys.path.insert(0, os.path.realpath(os.path.join(__file__, '..', '..')))
-
 from debler import builder
 
-builder.publish(sys.argv[1])
+
+def run(args):
+    builder.publish(args.kind[:-1])
+
+
+def register(subparsers):
+    parser = subparsers.add_parser('publish')
+    parser.add_argument('kind', choices=['gems', 'apps'])
+    parser.set_defaults(run=run)

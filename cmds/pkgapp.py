@@ -1,20 +1,23 @@
-#!/usr/bin/env python3
-import sys
-import os.path
-
-sys.path.insert(0, os.path.realpath(os.path.join(__file__, '..', '..')))
-
 from debler.app import AppInfo, AppBuilder
 from debler.builder import publish
 from debler.db import Database
 
-db = Database()
-app = AppInfo.fromyml(db, sys.argv[1])
 
-app.schedule_gemdeps_builds()
+def run(args):
+    db = Database()
+    app = AppInfo.fromyml(db, args.app_info)
 
-builder = AppBuilder(db, app)
-builder.generate()
-builder.build()
+    app.schedule_gemdeps_builds()
 
-publish('app')
+    builder = AppBuilder(db, app)
+    builder.generate()
+    builder.build()
+
+    publish('app')
+
+
+def register(subparsers):
+    parser = subparsers.add_parser('pkgapp')
+    parser.add_argument('app_info',
+                        help='file to app info yml description file')
+    parser.set_defaults(run=run)

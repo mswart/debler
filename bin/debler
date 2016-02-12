@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+import sys
+import os.path
+import argparse
+from importlib import import_module
+
+# path import path to be able to import debler and cmds:
+sys.path.insert(0, os.path.realpath(os.path.join(__file__, '..', '..')))
+
+
+# build parser:
+parser = argparse.ArgumentParser(prog='debler')
+subparserse = parser.add_subparsers()
+
+for cmd_name in ['pkgapp', 'build', 'publish', 'rebuild']:
+    cmd = import_module('cmds.{}'.format(cmd_name))
+    getattr(cmd, 'register')(subparserse)
+
+# parse arguments and execute selected command:
+args = parser.parse_args()
+args.run(args)

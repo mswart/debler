@@ -9,7 +9,7 @@ keyid = hex(data['keyid'])
 maintainer = data['maintainer']
 rubygems = data['rubygems']
 rubies = [str(r) for r in data['rubies']]
-gem_format = data['gem_format']
+gem_format = [int(s) for s in str(data['gem_format']).split('.')]
 distribution = data['distribution']
 
 del data
