@@ -59,9 +59,16 @@ class Database():
 
     def scheduled_builds(self):
         c = self.conn.cursor()
-        c.execute('SELECT name, slot, version, revision FROM package_versions WHERE state = %s', ('scheduled', ))
-        for pkg in c:
-            yield pkg
+        while True:
+            c.execute('''SELECT name, slot, version, revision
+                         FROM package_versions
+                         WHERE state = %s
+                         LIMIT 1''', ('scheduled', ))
+            pkg = c.fetchone()
+            if pkg:
+                yield pkg
+            else:
+                break
 
     def update_build(self, name, slot, version, revision, state):
         c = self.conn.cursor()
