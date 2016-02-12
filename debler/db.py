@@ -61,7 +61,6 @@ class Database():
         c = self.conn.cursor()
         c.execute('SELECT name, slot, version, revision FROM package_versions WHERE state = %s', ('scheduled', ))
         for pkg in c:
-            print(pkg)
             yield pkg
 
     def update_build(self, name, slot, version, revision, state):
