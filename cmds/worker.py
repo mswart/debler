@@ -27,10 +27,7 @@ for data in db.scheduled_builds():
     try:
         db.update_build(*data, state='generating')
         conv = GemBuilder(db, *data)
-        conv.create_dirs()
-        conv.fetch_source()
-        conv.build_orig_tar()
-        conv.gen_debian_files()
+        conv.generate()
         db.update_build(*data, state='building')
         conv.build()
         db.update_build(*data, state='finished')

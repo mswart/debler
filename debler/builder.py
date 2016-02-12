@@ -10,13 +10,11 @@ class BaseBuilder():
     def gemnam2deb(name):
         return 'debler-rubygem-' + name.replace('_', '--')
 
-    def create_dirs(self):
-        os.makedirs(self.debian_file('source'), exist_ok=True)
-
     def debian_file(self, arg, *extra_args):
         return os.path.join(self.pkg_dir, 'debian', arg, *extra_args)
 
-    def gen_debian_files(self):
+    def gen_debian_package(self):
+        os.makedirs(self.debian_file('source'), exist_ok=True)
         self.generate_source_format()
         self.generate_compat_file()
         self.generate_copyright_file()
@@ -43,9 +41,11 @@ Licence: See LICENCE file
   [LICENCE TEXT]
 """.format(self.orig_name))
 
-    def build(self):
+    def create_source_package(self):
         os.chdir(self.pkg_dir)
         subprocess.check_call(['dpkg-source', '-b', '.'])
+
+    def build(self):
         os.chdir(self.slot_dir)
 
         subprocess.check_call(['sbuild',

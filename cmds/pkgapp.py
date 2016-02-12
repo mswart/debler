@@ -14,9 +14,7 @@ app = AppInfo.fromyml(db, sys.argv[1])
 app.schedule_gemdeps_builds()
 
 builder = AppBuilder(db, app)
-builder.create_dirs()
-builder.build_orig_tar()
-builder.gen_debian_files()
+builder.generate()
 builder.build()
 
 publish('app')

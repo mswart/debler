@@ -66,6 +66,11 @@ class AppBuilder(BaseBuilder):
         self.orig_name = app.name
         self.deb_name = app.name
 
+    def generate(self):
+        self.build_orig_tar()
+        self.gen_debian_package()
+        self.create_source_package()
+
     @property
     def pkg_dir(self):
         return os.path.join(

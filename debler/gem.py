@@ -2,7 +2,10 @@ import os
 import tarfile
 import gzip
 import yaml
+import shutil
 import subprocess
+from tempfile import TemporaryDirectory
+
 from debian.deb822 import Deb822, Dsc
 from debian.changelog import Changelog
 
@@ -77,18 +80,42 @@ class GemBuilder(BaseBuilder):
             self.own_name += '-' + str(self.gem_slot)
         self.deb_name = self.gemnam2deb(self.own_name)
 
+    def generate(self):
+        self.create_dirs()
+        self.fetch_source()
+        self.build_orig_tar()
+        with TemporaryDirectory() as d:
+            self.pkg_dir = d + '/' + self.gem_name + '-' + str(self.gem_slot)
+            self.gen_debian_package()
+            self.create_source_package()
+            os.makedirs(self.slot_dir)
+            ppkg_dir = os.path.dirname(self.pkg_dir)
+            debian_tar = '{}_{}.debian.tar.gz'.format(self.deb_name, self.deb_version)
+            shutil.move(os.path.join(ppkg_dir, debian_tar), os.path.join(self.slot_dir, debian_tar))
+            dsc = '{}_{}.dsc'.format(self.deb_name, self.deb_version)
+            shutil.move(os.path.join(ppkg_dir, dsc), os.path.join(self.slot_dir, dsc))
+            orig_tar = os.path.join(self.slot_dir,
+                                    '{}_{}.orig.tar.xz'.format(self.deb_name,
+                                                               str(self.gem_version)))
+            os.symlink(os.path.relpath(self.orig_tar, start=self.slot_dir), orig_tar)
+
+        del self.pkg_dir
+
     def parse_metadata(self):
         with tarfile.open(name=self.src_file) as t:
             metadata = gzip.GzipFile(fileobj=t.extractfile('metadata.gz')).read()
             self.metadata = yaml.load(metadata)
 
     def create_dirs(self):
-        super().create_dirs()
         os.makedirs(os.path.dirname(self.src_file), exist_ok=True)
 
     @property
     def src_file(self):
-        return os.path.join(config.gemdir, self.gem_name, str(self.gem_version), 'orig.gem')
+        return os.path.join(config.gemdir, self.gem_name[0], self.gem_name, 'versions', str(self.gem_version), 'orig.gem')
+
+    @property
+    def orig_tar(self):
+        return os.path.join(config.gemdir, self.gem_name[0], self.gem_name, 'versions', str(self.gem_version), 'orig.tar.xz')
 
     def fetch_source(self):
         if not os.path.isfile(self.src_file):
@@ -98,29 +125,29 @@ class GemBuilder(BaseBuilder):
                                    '-O', self.src_file])
 
     @property
-    def pkg_dir(self):
-        return os.path.join(
-            self.slot_dir,
-            self.gem_name + '-' + str(self.gem_slot))
-
-    @property
     def slot_dir(self):
         return os.path.join(
             config.gemdir,
+            self.gem_name[0],
             self.gem_name,
-            'slot' + str(self.gem_slot))
+            'slots',
+            str(self.gem_slot),
+            self.deb_version)
 
     def symlink_orig_tar(self):
-        orig_tar = os.path.join(self.slot_dir,
+        orig_tar = os.path.join(self.pkg_dir, '..',
                                 '{}_{}.orig.tar.xz'.format(self.deb_name,
                                 str(self.gem_version)))
-        if not os.path.islink(orig_tar):
-            os.symlink(os.path.join('..', str(self.gem_version), 'orig.gem.xz'), orig_tar)
+        os.symlink(self.orig_tar, orig_tar)
+
+    def extract_orig_tar(self):
+        os.chdir(self.pkg_dir)
+        subprocess.call(['tar', '--extract', '--file', self.orig_tar])
 
     def build_orig_tar(self):
-        if os.path.isfile(self.src_file + '.xz'):
+        if os.path.isfile(self.orig_tar):
             return
-        outtar = tarfile.open(name=self.src_file + '.xz', mode='w:xz')
+        outtar = tarfile.open(name=self.orig_tar, mode='w:xz')
         intar = tarfile.open(name=self.src_file)
         # 1. add metadata as yml file
         gz = gzip.GzipFile(fileobj=intar.extractfile('metadata.gz'))
@@ -137,10 +164,11 @@ class GemBuilder(BaseBuilder):
         # 3. flush all
         outtar.close()
 
-    def gen_debian_files(self):
+    def gen_debian_package(self):
         self.parse_metadata()
         self.symlink_orig_tar()
-        super().gen_debian_files()
+        self.extract_orig_tar()
+        super().gen_debian_package()
 
     def generate_control_file(self):
         build_deps = [
