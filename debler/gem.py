@@ -135,9 +135,9 @@ class GemBuilder(BaseBuilder):
             self.deb_version)
 
     def symlink_orig_tar(self):
-        orig_tar = os.path.join(self.pkg_dir, '..',
-                                '{}_{}.orig.tar.xz'.format(self.deb_name,
-                                str(self.gem_version)))
+        orig_tar = os.path.realpath(os.path.join(self.pkg_dir, '..',
+                                    '{}_{}.orig.tar.xz'.format(self.deb_name,
+                                    str(self.gem_version))))
         os.symlink(self.orig_tar, orig_tar)
 
     def extract_orig_tar(self):
@@ -167,8 +167,8 @@ class GemBuilder(BaseBuilder):
     def gen_debian_package(self):
         self.parse_metadata()
         self.symlink_orig_tar()
-        self.extract_orig_tar()
         super().gen_debian_package()
+        self.extract_orig_tar()
 
     def generate_control_file(self):
         build_deps = [
