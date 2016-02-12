@@ -10,5 +10,6 @@ maintainer = data['maintainer']
 rubygems = data['rubygems']
 rubies = [str(r) for r in data['rubies']]
 gem_format = data['gem_format']
+distribution = data['distribution']
 
 del data

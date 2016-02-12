@@ -52,7 +52,7 @@ class AppInfo():
                 self.db.create_gem_version(
                     name, slot,
                     version=gem.version.todb(), revision=1,
-                    changelog='Import newly into debler', distribution='trusty')
+                    changelog='Import newly into debler', distribution=config.distribution)
 
     @property
     def gems(self):
@@ -95,7 +95,7 @@ class AppBuilder(BaseBuilder):
             deb_version = '.'.join([str(v) for v in self.app.version]) + '-1'
             change = 'Build with debler'
         changes.new_block(package=self.deb_name, version=deb_version,
-                          distributions='trusty', urgency='low',
+                          distributions=config.distribution, urgency='low',
                           author=config.maintainer,
                           date=datetime.now(tz=tzlocal()).strftime('%a, %d %b %Y %H:%M:%S %z'))
         self.deb_version = deb_version

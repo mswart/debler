@@ -49,7 +49,7 @@ Licence: See LICENCE file
         os.chdir(self.slot_dir)
 
         subprocess.check_call(['sbuild',
-                               '--dist', 'trusty',
+                               '--dist', config.distribution,
                                '--keyid', config.keyid,
                                '--maintainer', config.maintainer,
                                '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
