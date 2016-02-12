@@ -4,6 +4,6 @@ import os.path
 
 sys.path.insert(0, os.path.realpath(os.path.join(__file__, '..', '..')))
 
-from debler import gem2dsc
+from debler import builder
 
-gem2dsc.publish()
+builder.publish(sys.argv[1])
