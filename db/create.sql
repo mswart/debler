@@ -21,7 +21,7 @@ CREATE TABLE package_versions (
   version INT[] NOT NULL,
   revision INT NOT NULL,
   state VARCHAR(16) DEFAULT 'scheduled',
-  debler_version INT[] NULL,
+  format INT[] NULL,
   scheduled_at timestamptz NOT NULL,
   changelog TEXT,
   distribution VARCHAR(25),

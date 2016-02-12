@@ -9,5 +9,6 @@ keyid = hex(data['keyid'])
 maintainer = data['maintainer']
 rubygems = data['rubygems']
 rubies = data['rubies']
+gem_format = data['gem_format']
 
 del data

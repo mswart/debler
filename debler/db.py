@@ -5,11 +5,10 @@ from datetime import datetime
 from dateutil.tz import tzlocal
 
 from debler.gem import GemVersion
+from debler import config
 
 
 class Database():
-    current_debler_version = [1, 4]
-
     rubygems = 'https://rubygems.org'
 
     def __init__(self):
@@ -76,13 +75,13 @@ class Database():
         self.conn.commit()
 
     def create_gem_version(self, name, slot, *, version, revision,
-                           debler_version=None, changelog, distribution):
+                           format=None, changelog, distribution):
         now = datetime.now(tz=tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z')
         c = self.conn.cursor()
         c.execute("""INSERT INTO package_versions (name, slot, version, revision,
-                debler_version, scheduled_at, changelog, distribution)
+                format, scheduled_at, changelog, distribution)
              VALUES (%s, %s, %s, %s, %s, %s, %s, %s);""",
-                  (name, list(slot), version, revision, debler_version or self.current_debler_version,
+                  (name, list(slot), version, revision, format or config.gem_format,
                    now, changelog, distribution))
         self.conn.commit()
 
@@ -95,7 +94,7 @@ class Database():
         for version, revision, scheduled_at, changelog, distribution in c:
             yield (GemVersion(version), revision, scheduled_at, changelog, distribution)
 
-    def debler_format_rebuild(self, changelog):
+    def gem_format_rebuild(self, changelog):
         c = self.conn.cursor()
         c.execute("""SELECT name, slot, version, revision, dist
             FROM (
@@ -103,16 +102,13 @@ class Database():
                     first_value(version) OVER w AS version,
                     first_value(revision) OVER w AS revision,
                     first_value(distribution) OVER w AS dist,
-                    first_value(debler_version) over w AS debler
+                    first_value(format) over w AS format
                 FROM package_versions
                 WINDOW w AS (PARTITION BY name, slot ORDER BY version DESC, revision DESC)
             ) AS w
-            WHERE debler < %s;""", (list(self.current_debler_version), ))
-        for name, slot, version, revision, dist in c:
-            self.create_gem_version(
-                name, slot,
-                version=version, revision=revision + 1,
-                changelog=changelog, distribution=dist)
+            WHERE format < %s;""", (list(config.gem_format), ))
+        for data in c:
+            self.gem_rebuild(changelog, *data)
 
     def gem_rebuild(self, name, message):
         c = self.conn.cursor()
@@ -126,8 +122,12 @@ class Database():
                 WINDOW w AS (PARTITION BY name, slot ORDER BY version DESC, revision DESC)
             ) AS w
             WHERE name = %s""", (name, ))
-        for name, slot, version, revision, dist in c:
-            self.create_gem_version(
-                name, slot,
-                version=version, revision=revision + 1,
-                changelog=message, distribution=dist)
+        for data in c:
+            self.gem_rebuild(message, *data)
+
+    def _gem_rebuild(self, message, name, slot, version, revision, dist):
+        print('rebuild name:{} in version {}-{}'.format(name, '.'.join(slot), '.'.join(version), revision))
+        self.create_gem_version(
+            name, slot,
+            version=version, revision=revision + 1,
+            changelog=message, distribution=dist)

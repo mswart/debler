@@ -16,4 +16,4 @@ if gems:
     for gem in gems:
         db.gem_rebuild(gem, msg)
 else:
-    db.debler_format_rebuild(sys.argv[1])
+    db.gem_format_rebuild(sys.argv[1])
