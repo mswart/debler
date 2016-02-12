@@ -118,12 +118,15 @@ class AppBuilder(BaseBuilder):
         control['Package'] = self.deb_name
         control['Architecture'] = 'all'
         self.load_paths = {'all': []}
+        self.bin_paths = []
         self.installs = {'all': []}
         self.symlinks = {'all': []}
         deps = []
         natives = []
         for name, gem in self.app.gems.items():
-            if not gem.version:
+            if not gem.version:  # included by path
+                self.load_paths['all'].append('/usr/share/{name}/{path}/{}'.format('lib', name=self.app.name, path=gem.path))
+                self.installs['all'].append((gem.path, '/usr/share/{name}/{path}'.format('lib', name=self.app.name, path=os.path.dirname(gem.path))))
                 continue
             level, builddeps, native, slots = self.db.gem_info(name)
             slot = tuple(gem.version.limit(level).todb())
@@ -134,10 +137,10 @@ class AppBuilder(BaseBuilder):
             ))
             deb_dep = self.gemnam2deb(gem_slot_name)
             self.load_paths['all'].append('/usr/share/rubygems-debler/{name}/{}/'.format('lib', name=gem_slot_name))
+            self.bin_paths.append('/usr/share/rubygems-debler/{name}/{}/'.format('bin', name=gem_slot_name))
             if native:
-                natives.append(deb_dep)
+                natives.append((deb_dep, gem_slot_name))
             if gem.constraints:
-                print(gem.constraints)
                 for constraint in gem.constraints:
                     op, vers = constraint.split(' ')
                     if op == '~>':
@@ -169,9 +172,9 @@ class AppBuilder(BaseBuilder):
             control['Package'] = self.deb_name + '-ruby' + ruby
             control['Architecture'] = 'all'
             deps = ['ruby' + ruby]
-            for deb_dep in natives:
+            for deb_dep, gem_slot_name in natives:
                 deps.append('{}-ruby{}'.format(deb_dep, ruby))
-                self.load_paths[ruby + '.0'].append('/usr/lib/${{DEB_BUILD_MULTIARCH}}/rubygems-debler/{v}.0/{name}/'.format(v=ruby, name=deb_dep))
+                self.load_paths[ruby + '.0'].append('/usr/lib/DEB_BUILD_MULTIARCH/rubygems-debler/{v}.0/{name}/'.format(v=ruby, name=gem_slot_name))
             deps.append('${shlibs:Depends}')
             deps.append('${misc:Depends}')
 
@@ -187,6 +190,12 @@ class AppBuilder(BaseBuilder):
     def generate_rules_file(self):
         with open(self.debian_file('rules'), 'w') as f:
             f.write("#!/usr/bin/make -f\n%:\n\tdh $@\n")
+
+            f.write('\noverride_dh_auto_build:\n')
+            for version in self.load_paths:
+                if version == 'all':
+                    continue
+                f.write('\tsed --in-place --expression=s:/DEB_BUILD_MULTIARCH/:/${{DEB_BUILD_MULTIARCH}}/: debian/data/{} \n'.format(version))
 
         for dir in self.app.dirs:
             self.installs['all'].append((dir, '/usr/share/{}\n'.format(self.app.name)))
@@ -223,7 +232,7 @@ class AppBuilder(BaseBuilder):
                     f.write('#!/usr/bin/ruby{}\n'.format(ruby))
                     f.write('Dir.chdir("/usr/share/{}")\n'.format(self.app.name))
                     f.write('ENV[\'HOME\'] = \'/tmp\'\n')  # will be fixed later
-                    f.write('ENV[\'RAILS_ENV\'] = \'{}\'\n'.format(self.app.default_env))
+                    f.write('ENV[\'RAILS_ENV\'] ||= \'{}\'\n'.format(self.app.default_env))
                     f.write('ENV[\'GEM_PATH\'] = \'/usr/share/{}/.debler/gems\'\n'.format(self.app.name))
                     f.write('$LOAD_PATH << \'/usr/share/{}/.debler/lib\'\n'.format(self.app.name))
                     f.write('File.readlines("/usr/share/{}/.debler/load_paths/all").each do |dir|\n'.format(self.app.name))
@@ -232,9 +241,47 @@ class AppBuilder(BaseBuilder):
                     f.write('File.readlines("/usr/share/{}/.debler/load_paths/{}.0").each do |dir|\n'.format(self.app.name, ruby))
                     f.write('  $LOAD_PATH << dir.strip\n')
                     f.write('end\n')
-                    f.write('load ARGF.argv.shift\n')
+                    f.write('exe = ARGF.argv.shift\n')
+                    f.write('if File.exist? exe\n')
+                    f.write('  load exe\n')
+                    f.write('else\n')
+                    f.write('  path = [\n')
+                    for bin_path in self.bin_paths:
+                        f.write('    \'{}\',\n'.format(bin_path))
+                    f.write('  ].find do |dir|\n')
+                    f.write('      File.exist? "#{dir}/#{exe}"\n')
+                    f.write('  end\n')
+                    f.write('  load path + \'/\' + exe\n')
+                    f.write('end\n')
                 self.installs[ruby + '.0'].append((os.path.join('debian', 'bin', self.app.name + ruby), '/usr/bin'))
                 os.chmod(self.debian_file('bin', self.app.name + ruby), 0o755)
+
+                with open(self.debian_file('{}-ruby{}.postinst'.format(self.app.name, ruby)), 'w') as f:
+                    f.write('#!/bin/sh\n')
+                    f.write('set -e\n\n')
+                    f.write('update-alternatives --install /usr/bin/{app} {app} /usr/bin/{app}{ruby} {priority}\n'.format(
+                        app=self.app.name, ruby=ruby, priority='9' + ruby.replace('.', '')))
+                    f.write('\n')
+                    f.write('#DEBHELPER#\n\n')
+                    f.write('exit 0\n')
+
+                with open(self.debian_file('{}-ruby{}.prerm'.format(self.app.name, ruby)), 'w') as f:
+                    f.write('#!/bin/sh\n')
+                    f.write('set -e\n\n')
+                    f.write('case "$1" in\n')
+                    f.write('  remove|deconfigure)\n')
+                    f.write('    update-alternatives --remove {app} /usr/bin/{app}{ruby}\n'.format(
+                        app=self.app.name, ruby=ruby))
+                    f.write('    ;;\n\n')
+                    f.write('  upgrade|failed-upgrade)\n')
+                    f.write('    ;;\n\n')
+                    f.write('  *)\n')
+                    f.write('    echo "prerm called with unknown argument \\`$1\'" >&2\n')
+                    f.write('    exit 0\n')
+                    f.write('    ;;\n\n')
+                    f.write('esac\n\n')
+                    f.write('#DEBHELPER#\n\n')
+                    f.write('exit 0\n')
 
             self.installs['all'].append((os.path.join('debian', 'lib'), '/usr/share/{}/.debler'.format(self.app.name)))
             with open(self.debian_file('lib', 'bundler', 'setup.rb'), 'w') as f:
@@ -242,6 +289,16 @@ class AppBuilder(BaseBuilder):
 
             with open(self.debian_file('lib', 'bundler.rb'), 'w') as f:
                 f.write('class Bundler\n')
+                f.write('  def self.load_gem(name)\n')
+                f.write('    Kernel.require name\n')
+                f.write('  rescue LoadError\n')
+                f.write('    if name.include? \'-\'\n')
+                f.write('      Kernel.require name.gsub(\'-\', \'/\')\n')
+                f.write('    else\n')
+                f.write('      raise\n')
+                f.write('    end\n')
+                f.write('  end\n')
+                f.write('\n')
                 f.write('  def self.require(*groups)\n')
 
                 for name in self.app.gemfile.sorted_gems:
@@ -249,9 +306,9 @@ class AppBuilder(BaseBuilder):
                     if not gem.require:
                         continue
                     if 'default' in gem.envs:
-                        f.write('  Kernel.require "{}"\n'.format(name))
+                        f.write('    load_gem "{}"\n'.format(name))
                     else:
-                        f.write('  Kernel.require "{}" unless (groups & ["{}"]).empty?\n'.format(name, '", "'.join(gem.envs)))
+                        f.write('    load_gem "{}" unless (groups & ["{}"]).empty?\n'.format(name, '", "'.join(gem.envs)))
                 f.write('  end\n')
                 f.write('end\n')
 

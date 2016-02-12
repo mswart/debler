@@ -27,13 +27,14 @@ class GemfileGem():
 
 
 class Gem():
-    def __init__(self, name, version, constraints, envs, require=False):
+    def __init__(self, name, version, constraints, envs, require=False, path=None):
         self.name = name
         self.version = version
         self.constraints = constraints
         self.envs = envs
         self.deps = {}
         self.require = require
+        self.path = path
 
     def __repr__(self):
         v = str(self.version)
@@ -129,11 +130,13 @@ class Parser():
         for o in d:
             if type(o) is GemfileGem:
                 self.gems[o.name] = Gem(o.name, None, o.constraints,
-                                        o.opts['envs'], o.opts.get('require', True))
+                                        o.opts['envs'], o.opts.get('require', True),
+                                        o.opts.get('path', None))
             elif type(o) is tuple:
                 for os in o:
                     self.gems[os.name] = Gem(os.name, None, os.constraints,
-                                             os.opts['envs'], os.opts.get('require', True))
+                                             os.opts['envs'], os.opts.get('require', True),
+                                             os.opts.get('path', None))
 
     def parse_gemlock(self, file):
         current_state = None
