@@ -12,8 +12,6 @@ class Database():
 
     rubygems = 'https://rubygems.org'
 
-    rubies = ('2.2', '2.1')
-
     def __init__(self):
         self.conn = psycopg2.connect('dbname=debler')
 

@@ -148,7 +148,7 @@ class GemBuilder(BaseBuilder):
         ]
         exts = self.extension_list()
         if len(exts) > 0:
-            for ruby in self.db.rubies:
+            for ruby in config.rubies:
                 build_deps.append('ruby{}'.format(ruby))
                 build_deps.append('ruby{}-dev'.format(ruby))
 
@@ -225,7 +225,7 @@ class GemBuilder(BaseBuilder):
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')
         if len(exts) > 0:
-            deps.append(' | '.join(['{}-ruby{} (= ${{binary:Version}})'.format(self.deb_name, ruby) for ruby in self.db.rubies]))
+            deps.append(' | '.join(['{}-ruby{} (= ${{binary:Version}})'.format(self.deb_name, ruby) for ruby in config.rubies]))
 
         control['Depends'] = ', '.join(deps)
         control['Section'] = 'ruby'
@@ -237,7 +237,7 @@ class GemBuilder(BaseBuilder):
         control.dump(control_file)
 
         if len(exts) > 0:
-            for ruby in self.db.rubies:
+            for ruby in config.rubies:
                 control = Deb822()
                 control['Package'] = self.deb_name + '-ruby' + ruby
                 control['Architecture'] = 'any'
@@ -269,12 +269,12 @@ class GemBuilder(BaseBuilder):
         _, opts, _, _ = self.db.gem_info(self.gem_name)
         ext_args = opts.get("default", {}).get('ext_args', '')
         if len(exts) == 1:
-            rules['build'].append(' v'.join(['mkdir'] + list(self.db.rubies)))
-            for ruby in self.db.rubies:
+            rules['build'].append(' v'.join(['mkdir'] + list(config.rubies)))
+            for ruby in config.rubies:
                 rules['build'].append('cd v{v} && ruby{v} ../src/{} {}'.format(exts[0], ext_args, v=ruby))
-            for ruby in self.db.rubies:
+            for ruby in config.rubies:
                 rules['build'].append('make -C v{v}'.format(v=ruby))
-            for ruby in self.db.rubies:
+            for ruby in config.rubies:
                 rules['install'].append(' '.join([
                     'dh_install',
                     '-p{package}',
@@ -283,17 +283,17 @@ class GemBuilder(BaseBuilder):
                         v=ruby, name=self.own_name, package=self.deb_name + '-ruby' + ruby))
 
         elif len(exts) > 1:
-            rules['build'].append(' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in self.metadata['extensions'] for ruby in self.db.rubies]))
+            rules['build'].append(' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in self.metadata['extensions'] for ruby in config.rubies]))
             for ext in exts:
-                for ruby in self.db.rubies:
+                for ruby in config.rubies:
                     rules['build'].append('cd v{v}/{ext} && ruby{v} ../../src/{} {}'.format(
                         ext, ext_args, ext=ext.replace('/', '_'), v=ruby))
             for ext in exts:
-                for ruby in self.db.rubies:
+                for ruby in config.rubies:
                     rules['build'].append('make -C v{v}/{ext}'.format(
                         ext=ext.replace('/', '_'), v=ruby))
             for ext in exts:
-                for ruby in self.db.rubies:
+                for ruby in config.rubies:
                     rules['install'].append(' '.join([
                         'dh_install',
                         '-p{package}',

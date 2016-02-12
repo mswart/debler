@@ -8,5 +8,6 @@ gemdir = data['gemdir']
 keyid = hex(data['keyid'])
 maintainer = data['maintainer']
 rubygems = data['rubygems']
+rubies = data['rubies']
 
 del data

@@ -154,7 +154,7 @@ class AppBuilder(BaseBuilder):
                         deps.append('{} ({} {})'.format(deb_dep, {'=': '>=', '>': '>='}.get(op, op), vers))
             else:
                 deps.append(deb_dep)
-        deps.append(' | '.join([self.deb_name + '-ruby' + ruby for ruby in self.db.rubies]))
+        deps.append(' | '.join([self.deb_name + '-ruby' + ruby for ruby in config.rubies]))
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')
 
@@ -165,7 +165,7 @@ class AppBuilder(BaseBuilder):
         control_file.write(b'\n')
         control.dump(control_file)
 
-        for ruby in self.db.rubies:
+        for ruby in config.rubies:
             self.load_paths[ruby + '.0'] = []
             self.installs[ruby + '.0'] = []
             control = Deb822()
@@ -211,7 +211,7 @@ class AppBuilder(BaseBuilder):
 
         for executable in self.app.executables:
             self.installs['all'].append((executable, '/usr/share/{}/{}'.format(self.app.name, os.path.dirname(executable))))
-            for ruby in self.db.rubies:
+            for ruby in config.rubies:
                 with open(self.debian_file('bin', os.path.basename(executable) + ruby), 'w') as f:
                     f.write('#!/usr/bin/ruby{}\n'.format(ruby))
                     f.write('File.readlines("/usr/share/{}/.debler/load_paths/all").each do |dir|\n'.format(self.app.name))
@@ -227,7 +227,7 @@ class AppBuilder(BaseBuilder):
         if self.app.bundler_laucher:
             os.makedirs(self.debian_file('lib/bundler'), exist_ok=True)
 
-            for ruby in self.db.rubies:
+            for ruby in config.rubies:
                 with open(self.debian_file('bin', self.app.name + ruby), 'w') as f:
                     f.write('#!/usr/bin/ruby{}\n'.format(ruby))
                     f.write('Dir.chdir("/usr/share/{}")\n'.format(self.app.name))
