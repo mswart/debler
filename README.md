@@ -32,6 +32,14 @@ They are used to schedule gem package upgrade and used when packaging applicatio
 Debler is implemented in Python 3. Python 3 is a modern scripting language, has good tooling for Debian (package) development. All needed dependencies exists as Debian packages, allow a easy packaging of Debler itself without chicken-egg problem.
 
 
+### Dependencies
+
+* debian
+* dateutil
+* psycopg2
+* lepl 
+
+
 ### Planed/missing Features
 
 Some important planed features:
