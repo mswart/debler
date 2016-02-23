@@ -12,5 +12,6 @@ rubygems = data['rubygems']
 rubies = [str(r) for r in data['rubies']]
 gem_format = [int(s) for s in str(data['gem_format']).split('.')]
 distribution = data['distribution']
+gem_package_upload = data['package_uploads']['gem']
 
 del data

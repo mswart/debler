@@ -1,4 +1,5 @@
 import traceback
+from tempfile import TemporaryDirectory
 
 from debler.db import Database
 from debler.gem import GemBuilder, GemVersion
@@ -23,10 +24,11 @@ def run(args):
         header(task)
         try:
             db.update_build(*data, state='generating')
-            conv = GemBuilder(db, *data)
-            conv.generate()
-            db.update_build(*data, state='building')
-            conv.build()
+            with TemporaryDirectory() as d:
+                conv = GemBuilder(db, d, *data)
+                conv.generate()
+                db.update_build(*data, state='building')
+                conv.build()
             db.update_build(*data, state='finished')
             header(task, color=32)
         except Exception:

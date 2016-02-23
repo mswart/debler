@@ -66,8 +66,9 @@ class GemInfo():
 
 
 class GemBuilder(BaseBuilder):
-    def __init__(self, db, gem, slot, version, revision):
+    def __init__(self, db, tmp_dir, gem, slot, version, revision):
         self.db = db
+        self.tmp_dir = tmp_dir
         self.gem_name = gem
         self.orig_name = gem
         self.gem_slot = GemVersion(slot)
@@ -80,26 +81,23 @@ class GemBuilder(BaseBuilder):
             self.own_name += '-' + str(self.gem_slot)
         self.deb_name = self.gemnam2deb(self.own_name)
 
+        self.pkg_dir = tmp_dir + '/' + self.gem_name + '-' + str(self.gem_slot)
+
     def generate(self):
         self.create_dirs()
         self.fetch_source()
-        self.build_orig_tar()
-        with TemporaryDirectory() as d:
-            self.pkg_dir = d + '/' + self.gem_name + '-' + str(self.gem_slot)
-            self.gen_debian_package()
-            self.create_source_package()
-            os.makedirs(self.slot_dir)
-            ppkg_dir = os.path.dirname(self.pkg_dir)
-            debian_tar = '{}_{}.debian.tar.gz'.format(self.deb_name, self.deb_version)
-            shutil.move(os.path.join(ppkg_dir, debian_tar), os.path.join(self.slot_dir, debian_tar))
-            dsc = '{}_{}.dsc'.format(self.deb_name, self.deb_version)
-            shutil.move(os.path.join(ppkg_dir, dsc), os.path.join(self.slot_dir, dsc))
-            orig_tar = os.path.join(self.slot_dir,
-                                    '{}_{}.orig.tar.xz'.format(self.deb_name,
-                                                               str(self.gem_version)))
-            os.symlink(os.path.relpath(self.orig_tar, start=self.slot_dir), orig_tar)
 
-        del self.pkg_dir
+        self.build_orig_tar()
+        self.gen_debian_package()
+        self.create_source_package()
+
+        changes = '{}_{}_source.changes'.format(self.deb_name, self.deb_version)
+        subprocess.call(['dput', config.gem_package_upload, os.path.join(self.tmp_dir, changes)])
+
+    def build(self):
+        super().build()
+        changes = '{}_{}_amd64.changes'.format(self.deb_name, self.deb_version)
+        subprocess.call(['dput', config.gem_package_upload, os.path.join(self.tmp_dir, changes)])
 
     def parse_metadata(self):
         with tarfile.open(name=self.src_file) as t:
@@ -111,11 +109,12 @@ class GemBuilder(BaseBuilder):
 
     @property
     def src_file(self):
-        return os.path.join(config.gemdir, self.gem_name[0], self.gem_name, 'versions', str(self.gem_version), 'orig.gem')
+        return os.path.join(config.gemdir, 'versions', self.gem_name, str(self.gem_version) + '.gem')
 
     @property
     def orig_tar(self):
-        return os.path.join(config.gemdir, self.gem_name[0], self.gem_name, 'versions', str(self.gem_version), 'orig.tar.xz')
+        return self.tmp_dir + '{}_{}.orig.tar.xz'.format(self.deb_name,
+                                                         str(self.gem_version))
 
     def fetch_source(self):
         if not os.path.isfile(self.src_file):
@@ -126,13 +125,7 @@ class GemBuilder(BaseBuilder):
 
     @property
     def slot_dir(self):
-        return os.path.join(
-            config.gemdir,
-            self.gem_name[0],
-            self.gem_name,
-            'slots',
-            str(self.gem_slot),
-            self.deb_version)
+        return self.tmp_dir
 
     def symlink_orig_tar(self):
         orig_tar = os.path.realpath(os.path.join(self.pkg_dir, '..',

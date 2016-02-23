@@ -43,7 +43,7 @@ Licence: See LICENCE file
 
     def create_source_package(self):
         os.chdir(self.pkg_dir)
-        subprocess.check_call(['dpkg-source', '-b', '.'])
+        subprocess.check_call(['dpkg-buildpackage', '-S'])
 
     def build(self):
         os.chdir(self.slot_dir)
