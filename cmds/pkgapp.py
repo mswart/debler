@@ -8,6 +8,8 @@ def run(args):
     app = AppInfo.fromyml(db, args.app_info)
 
     app.schedule_gemdeps_builds()
+    if args.schedule_gemdeps_builds_only:
+        return
 
     builder = AppBuilder(db, app)
     builder.generate()
@@ -20,4 +22,7 @@ def register(subparsers):
     parser = subparsers.add_parser('pkgapp')
     parser.add_argument('app_info',
                         help='file to app info yml description file')
+    parser.add_argument('--schedule-gemdeps-builds-only', '-D',
+                        action='store_true', default=False,
+                        help='only schedule needed builds for depended gems')
     parser.set_defaults(run=run)
