@@ -93,6 +93,7 @@ class GemBuilder(BaseBuilder):
 
         changes = '{}_{}_source.changes'.format(self.deb_name, self.deb_version)
         subprocess.call(['dput', config.gem_package_upload, os.path.join(self.tmp_dir, changes)])
+        os.unlink(os.path.join(self.tmp_dir, changes))
 
     def build(self):
         super().build()
