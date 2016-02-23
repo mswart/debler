@@ -12,7 +12,7 @@ class Database():
     rubygems = 'https://rubygems.org'
 
     def __init__(self):
-        self.conn = psycopg2.connect('dbname=debler')
+        self.conn = psycopg2.connect(config.database)
 
     def register_gem(self, name, level, builddeps=None, native=False):
         if builddeps is None:

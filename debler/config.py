@@ -3,6 +3,7 @@ import yaml
 
 data = yaml.load(open(os.path.expanduser('~/.debler.yml')))
 
+database = data['database']
 appdir = data['appdir']
 gemdir = data['gemdir']
 keyid = hex(data['keyid'])
