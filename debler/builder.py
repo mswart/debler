@@ -52,7 +52,7 @@ Licence: See LICENCE file
 
     def upload_source_package(self):
         changes = '{}_{}_source.changes'.format(self.deb_name, self.deb_version)
-        subprocess.call(['dput', self.package_upload, os.path.join(self.tmp_dir, changes)])
+        subprocess.check_call(['dput', self.package_upload, os.path.join(self.tmp_dir, changes)])
         os.unlink(os.path.join(self.tmp_dir, changes))
 
     def generate(self):
@@ -72,7 +72,7 @@ Licence: See LICENCE file
                                '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
 
         changes = '{}_{}_amd64.changes'.format(self.deb_name, self.deb_version)
-        subprocess.call(['dput', self.package_upload, os.path.join(self.tmp_dir, changes)])
+        subprocess.check_call(['dput', self.package_upload, os.path.join(self.tmp_dir, changes)])
 
 
 def publish(dir):
