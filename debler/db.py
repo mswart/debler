@@ -43,7 +43,8 @@ class Database():
             self.register_gem(name, level, native=native)
             return self.gem_info(name)
         level, opts, native = result
-        opts = json.loads(opts)
+        if type(opts) is str:
+            opts = json.loads(opts)
         slots = []
         c.execute('SELECT slot FROM packages WHERE name = %s', (name, ))
         for slot in c:
