@@ -61,16 +61,13 @@ class AppInfo():
 
 
 class AppBuilder(BaseBuilder):
-    def __init__(self, db, app):
+    def __init__(self, db, tmp_dir, app):
         self.db = db
+        self.tmp_dir = tmp_dir
         self.app = app
         self.orig_name = app.name
         self.deb_name = app.name
-
-    def generate(self):
-        self.build_orig_tar()
-        self.gen_debian_package()
-        self.create_source_package()
+        self.package_upload = config.app_package_upload
 
     @property
     def pkg_dir(self):
@@ -80,9 +77,7 @@ class AppBuilder(BaseBuilder):
 
     @property
     def slot_dir(self):
-        return os.path.join(
-            config.appdir,
-            self.app.name)
+        return self.tmp_dir
 
     def generate_changelog_file(self):
         changelog = self.debian_file('changelog')
@@ -338,13 +333,27 @@ class AppBuilder(BaseBuilder):
                 for file, dir in symlinks:
                     f.write('{} {}\n'.format(file, dir))
 
+    @property
+    def orig_tar(self):
+        return os.path.join(self.slot_dir, '{}_{}.orig.tar.xz'.format(self.deb_name, '.'.join(str(v) for v in self.app.version)))
+
     def build_orig_tar(self):
-        orig_tar = os.path.join(self.slot_dir, '{}_{}.orig.tar.xz'.format(self.deb_name, '.'.join(str(v) for v in self.app.version)))
-        if os.path.isfile(orig_tar):
+        if os.path.isfile(self.orig_tar):
             return
-        subprocess.call([
-            'tar', '--create',
-            '--directory', self.app.basedir,
-            '--xz',
-            '--file', orig_tar,
-            '.'])
+        if os.path.isfile(os.path.join('.git', 'HEAD')):
+            git_archive = subprocess.Popen(['git', 'archive',
+                                            '--format=tar', 'HEAD'],
+                                           stdout=subprocess.PIPE)
+            with open(self.orig_tar, 'w') as f:
+                xz = subprocess.Popen(['xz', '-9'], stdin=git_archive.stdout,
+                                      stdout=f)
+                git_archive.stdout.close()
+                xz.wait()
+                assert xz.returncode == 0
+        else:
+            subprocess.check_call([
+                'tar', '--create',
+                '--directory', self.app.basedir,
+                '--xz',
+                '--file', self.orig_tar,
+                '.'])

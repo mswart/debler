@@ -1,3 +1,5 @@
+from tempfile import TemporaryDirectory
+
 from debler.app import AppInfo, AppBuilder
 from debler.builder import publish
 from debler.db import Database
@@ -11,9 +13,10 @@ def run(args):
     if args.schedule_gemdeps_builds_only:
         return
 
-    builder = AppBuilder(db, app)
-    builder.generate()
-    builder.build()
+    with TemporaryDirectory() as d:
+        builder = AppBuilder(db, d, app)
+        builder.generate()
+        builder.build()
 
     publish('app')
 
