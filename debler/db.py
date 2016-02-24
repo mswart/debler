@@ -14,14 +14,10 @@ class Database():
     def __init__(self):
         self.conn = psycopg2.connect(config.database)
 
-    def register_gem(self, name, level, builddeps=None, native=False):
-        if builddeps is None:
-            builddeps = '{}'
-        else:
-            builddeps = '{"default": ["%s"]}' % builddeps
+    def register_gem(self, name, level, native=False):
         c = self.conn.cursor()
-        c.execute("""INSERT INTO gems (name, level, builddeps, native)
-             VALUES (%s, %s, %s, %s);""", (name, level, builddeps, native))
+        c.execute("""INSERT INTO gems (name, level, native)
+             VALUES (%s, %s, %s);""", (name, level, native))
         self.conn.commit()
 
     def create_gem_slot(self, name, slot):
