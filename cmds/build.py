@@ -1,5 +1,6 @@
 import traceback
 from tempfile import TemporaryDirectory
+import sys
 
 from debler.db import Database
 from debler.gem import GemBuilder, GemVersion
@@ -17,7 +18,9 @@ def header(content, color=33):
 
 def run(args):
     db = Database()
-    count = 0
+    total = 0
+    failed = 0
+    successful = 0
 
     for data in db.scheduled_builds():
         task = '{}:{} in version {}-{}'.format(data[0], GemVersion(data[1]), GemVersion(data[2]), data[3])
@@ -31,17 +34,24 @@ def run(args):
                 conv.build()
             db.update_build(*data, state='finished')
             header(task, color=32)
+            successful += 1
         except Exception:
             db.update_build(*data, state='failed')
+            failed += 1
             header(task, color=31)
             traceback.print_exc()
             if args.fail_fast:
                 break
-        count += 1
-        if args.limit and count >= args.limit:
+        total += 1
+        if args.limit and total >= args.limit:
             break
 
     publish('gem')
+
+    print('Built {} packages: {} successful, {} failed'.format(total, successful, failed))
+
+    if failed:
+        sys.exit(1)
 
 
 def register(subparsers):
