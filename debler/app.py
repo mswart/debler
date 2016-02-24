@@ -1,5 +1,6 @@
 import yaml
 from datetime import datetime
+import os
 import os.path
 import subprocess
 
@@ -36,7 +37,7 @@ class AppInfo():
 
     @classmethod
     def fromyml(cls, db, filename):
-        data = yaml.load(open(filename))
+        data = yaml.load(open(filename).read().format(**os.environ))
         if 'basedir' not in data:
             data['basedir'] = os.path.dirname(os.path.realpath(filename))
         return cls(db, **data)
