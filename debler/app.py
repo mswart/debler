@@ -197,6 +197,7 @@ class AppBuilder(BaseBuilder):
                 if version == 'all':
                     continue
                 f.write('\tsed --in-place --expression=s:/DEB_BUILD_MULTIARCH/:/${{DEB_BUILD_MULTIARCH}}/: debian/data/{} \n'.format(version))
+        os.chmod(self.debian_file('rules'), 0o755)
 
         for dir in self.app.dirs:
             self.installs['all'].append((dir, '/usr/share/{}\n'.format(self.app.name)))
