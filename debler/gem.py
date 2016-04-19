@@ -229,6 +229,7 @@ class GemBuilder(BaseBuilder):
                     deps.append(' | '.join(tmp))
             if not versioned_deps:
                 deps.append(req)
+        deps.extend(opts.get('default', {}).get('rundeps', []))
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')
         if len(exts) > 0:
