@@ -139,6 +139,7 @@ class AppBuilder(BaseBuilder):
             deb_dep = self.gemnam2deb(gem_slot_name)
             self.load_paths['all'].append('/usr/share/rubygems-debler/{name}/{}/'.format('lib', name=gem_slot_name))
             self.bin_paths.append('/usr/share/rubygems-debler/{name}/{}/'.format('bin', name=gem_slot_name))
+            self.bin_paths.append('/usr/share/rubygems-debler/{name}/{}/'.format('exe', name=gem_slot_name))
             if native:
                 natives.append((deb_dep, gem_slot_name))
             if gem.constraints:
