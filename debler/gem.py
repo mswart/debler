@@ -301,14 +301,20 @@ class GemBuilder(BaseBuilder):
                     rules['build'].append('make -C v{v}/{ext}'.format(
                         ext=ext.replace('/', '_'), v=ruby))
             for ext in exts:
+                subdir = opts.get('default', {}).get('so_subdir', '')
                 for ruby in config.rubies:
                     rules['install'].append(' '.join([
                         'dh_install',
                         '-p{package}',
                         'v{v}/{ext}/*.so',
-                        '/usr/lib/${{DEB_BUILD_MULTIARCH}}/rubygems-debler/{v}.0/{name}/']).format(
-                            v=ruby, name=self.own_name, package=self.deb_name + '-ruby' + ruby,
-                            ext=ext.replace('/', '_')))
+                        os.path.join('/', 'usr', 'lib',
+                                     '${{DEB_BUILD_MULTIARCH}}',
+                                     'rubygems-debler',
+                                     '{v}.0',
+                                     '{name}',
+                                     subdir)]).format(
+                        v=ruby, name=self.own_name, package=self.deb_name + '-ruby' + ruby,
+                        ext=ext.replace('/', '_')))
 
         with open(self.debian_file('rules'), 'w') as f:
             f.write("#!/usr/bin/make -f\n%:\n\tdh $@\n")
