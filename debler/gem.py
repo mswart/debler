@@ -276,6 +276,7 @@ class GemBuilder(BaseBuilder):
         exts = self.extension_list()
         _, opts, _, _ = self.db.gem_info(self.gem_name)
         ext_args = opts.get("default", {}).get('ext_args', '')
+        subdir = opts.get('default', {}).get('so_subdir', '')
         if len(exts) == 1:
             rules['build'].append(' v'.join(['mkdir'] + list(config.rubies)))
             for ruby in config.rubies:
@@ -287,8 +288,13 @@ class GemBuilder(BaseBuilder):
                     'dh_install',
                     '-p{package}',
                     'v{v}/*.so',
-                    '/usr/lib/${{DEB_BUILD_MULTIARCH}}/rubygems-debler/{v}.0/{name}/']).format(
-                        v=ruby, name=self.own_name, package=self.deb_name + '-ruby' + ruby))
+                    os.path.join('/', 'usr', 'lib',
+                                 '${{DEB_BUILD_MULTIARCH}}',
+                                 'rubygems-debler',
+                                 '{v}.0',
+                                 '{name}',
+                                 subdir)]).format(
+                    v=ruby, name=self.own_name, package=self.deb_name + '-ruby' + ruby))
 
         elif len(exts) > 1:
             rules['build'].append(' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in self.metadata['extensions'] for ruby in config.rubies]))
@@ -301,7 +307,6 @@ class GemBuilder(BaseBuilder):
                     rules['build'].append('make -C v{v}/{ext}'.format(
                         ext=ext.replace('/', '_'), v=ruby))
             for ext in exts:
-                subdir = opts.get('default', {}).get('so_subdir', '')
                 for ruby in config.rubies:
                     rules['install'].append(' '.join([
                         'dh_install',
