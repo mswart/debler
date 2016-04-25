@@ -21,3 +21,4 @@ def register(subparsers):
                        help='rebuild list of provided gem name')
     # todo: --native-rebuild
     parser.add_argument('gem', nargs='*', help='limit list of gems to rebuild')
+    parser.set_defaults(run=run)

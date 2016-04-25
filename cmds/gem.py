@@ -22,3 +22,4 @@ def register(subparsers):
                        help='add a other dir as required + schedule rebuilds of this gem')
     # todo: --native-rebuild
     parser.add_argument('gem', nargs='*', help='limit list of gems to rebuild')
+    parser.set_defaults(run=run)
