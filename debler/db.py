@@ -110,7 +110,7 @@ class Database():
             ) AS w
             WHERE format < %s;""", (list(config.gem_format), ))
         for data in c:
-            self.gem_rebuild(changelog, *data)
+            self._gem_rebuild(changelog, *data)
 
     def gem_rebuild(self, name, message):
         c = self.conn.cursor()
@@ -125,10 +125,12 @@ class Database():
             ) AS w
             WHERE name = %s""", (name, ))
         for data in c:
-            self.gem_rebuild(message, *data)
+            self._gem_rebuild(message, *data)
 
     def _gem_rebuild(self, message, name, slot, version, revision, dist):
-        print('rebuild name:{} in version {}-{}'.format(name, '.'.join(slot), '.'.join(version), revision))
+        print('rebuild name:{} in version {}-{}'.format(
+            name, '.'.join(str(s) for s in slot),
+            '.'.join(str(v) for v in version), revision))
         self.create_gem_version(
             name, slot,
             version=version, revision=revision + 1,
