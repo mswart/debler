@@ -51,6 +51,11 @@ class Database():
             slots.append(tuple(slot[0]))
         return level, opts, native, slots
 
+    def set_gem_opts(self, name, opts):
+        c = self.conn.cursor()
+        c.execute('UPDATE gems SET opts = %s WHERE name = %s', (json.dumps(opts), name))
+        self.conn.commit()
+
     def scheduled_builds(self):
         c = self.conn.cursor()
         while True:
