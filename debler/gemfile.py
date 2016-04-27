@@ -71,7 +71,7 @@ def ret(v):
     return call
 
 string = (lepl.Drop('\'') & lepl.Star(lepl.AnyBut('\'')) & lepl.Drop('\'')) > build_str
-symbol = lepl.Drop(':') & lepl.Star(lepl.AnyBut('\':\t ')) > build_str
+symbol = lepl.Drop(':') & lepl.Star(lepl.AnyBut('\':\t\n ')) > build_str
 
 line_comment = lepl.Literal('#') & lepl.Star(lepl.AnyBut('\n'))
 newline = lepl.Drop(lepl.Star(lepl.Space()) & lepl.Optional(line_comment) & lepl.Literal('\n') & lepl.Star(lepl.Space()))
