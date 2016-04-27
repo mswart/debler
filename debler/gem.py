@@ -36,6 +36,9 @@ class GemVersion():
             if part.startswith('beta'):
                 parts.append(-9)
                 part = part[4:]
+            elif part.startswith('xikolo'):
+                parts.append(-8)
+                continue
             parts.append(int(part))
         return cls(parts)
 
@@ -52,6 +55,8 @@ class GemVersion():
             elif part == -9:
                 s += 'beta'
                 needdot = False
+            elif part == -8:
+                s += 'xikolo'
         return s
 
     def todb(self):
