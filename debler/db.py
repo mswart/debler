@@ -87,12 +87,12 @@ class Database():
                    now, changelog, distribution))
         self.conn.commit()
 
-    def changelog_entries(self, name, slot):
+    def changelog_entries(self, name, slot, until_version):
         c = self.conn.cursor()
         c.execute("""SELECT version, revision, scheduled_at, changelog, distribution
             FROM package_versions
-            WHERE name=%s and slot = %s
-            ORDER BY version ASC, revision ASC;""", (name, list(slot)))
+            WHERE name=%s AND slot = %s AND version <= %s
+            ORDER BY version ASC, revision ASC;""", (name, list(slot), list(until_version)))
         for version, revision, scheduled_at, changelog, distribution in c:
             yield (GemVersion(version), revision, scheduled_at, changelog, distribution)
 
