@@ -126,6 +126,7 @@ class AppBuilder(BaseBuilder):
         natives = []
         for name, gem in self.app.gems.items():
             if not gem.version:  # included by path
+                assert gem.path is not None, 'gem "{!s}" does not have any version, but no path: {!r}!'.format(gem.name, gem)
                 self.load_paths['all'].append('/usr/share/{name}/{path}/{}'.format('lib', name=self.app.name, path=gem.path))
                 self.installs['all'].append((gem.path, '/usr/share/{name}/{path}'.format('lib', name=self.app.name, path=os.path.dirname(gem.path))))
                 continue
