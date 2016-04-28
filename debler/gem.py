@@ -2,9 +2,7 @@ import os
 import tarfile
 import gzip
 import yaml
-import shutil
 import subprocess
-from tempfile import TemporaryDirectory
 
 from debian.deb822 import Deb822, Dsc
 from debian.changelog import Changelog
@@ -358,7 +356,7 @@ Gem::Specification.new do |s|
                 authors='", "'.join(self.metadata['authors']),
                 date=self.metadata['date'].strftime('%Y-%m-%d'),
                 description=(self.metadata.get('description', '') or '').replace('"', '\\"'),
-                email=self.metadata['email'] if type(self.metadata['email']) is str else '", "'.join(self.metadata['email']),
+                email='", "'.join(self.metadata['email']) if type(self.metadata['email']) is list else self.metadata['email'],
                 homepage=self.metadata['homepage'],
                 licenses='", "'.join(self.metadata['licenses']),
                 summary=self.metadata.get('summary', '').replace('"', '\\"')))
