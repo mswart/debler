@@ -1,8 +1,24 @@
 import debler.db
+from debler.gem import GemVersion
+from debler import config
 
 
 def run(args):
     db = debler.db.Database()
+
+    if args.schedule:
+        for gem in args.gem:
+            name, version_str = gem.split(':')
+            version = GemVersion.fromstr(version_str)
+            level, builddeps, native, slots = db.gem_info(name)
+            slot = tuple(version.limit(level).todb())
+            if slot not in slots:
+                db.create_gem_slot(name, slot)
+            db.create_gem_version(
+                name, slot,
+                version=version.todb(), revision=1,
+                changelog='Import newly into debler', distribution=config.distribution)
+        return
 
     for gem in args.gem:
         _, opts, _, _ = db.gem_info(gem)
@@ -25,5 +41,7 @@ def register(subparsers):
                        help='add a other dir as required + schedule rebuilds of this gem')
     group.add_argument('--so-subdir',
                        help='set the so subdir + schedule rebuilds of this gem')
+    group.add_argument('--schedule', action='store_true',
+                       help='schedule building of gem:version tasks')
     parser.add_argument('gem', nargs='*', help='limit list of gems to rebuild')
     parser.set_defaults(run=run)
