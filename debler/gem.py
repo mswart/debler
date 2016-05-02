@@ -171,7 +171,8 @@ class GemBuilder(BaseBuilder):
         dsc['Source'] = self.deb_name
         dsc['Priority'] = 'optional'
         dsc['Maintainer'] = config.maintainer
-        dsc['Homepage'] = self.metadata['homepage']
+        if self.metadata['homepage']:
+            dsc['Homepage'] = self.metadata['homepage']
         dsc['Standards-Version'] = '3.9.6'
         dsc['Build-Depends'] = ', '.join(build_deps)
 
@@ -240,7 +241,8 @@ class GemBuilder(BaseBuilder):
 
         control['Depends'] = ', '.join(deps)
         control['Section'] = 'ruby'
-        control['Homepage'] = self.metadata['homepage']
+        if self.metadata['homepage']:
+            control['Homepage'] = self.metadata['homepage']
         control['Description'] = self.metadata['summary']
         control['Description'] += ('\n' + (self.metadata['description'] or '')).replace('\n\n', '\n.\n').replace('\n', '\n ')
 
@@ -357,7 +359,7 @@ Gem::Specification.new do |s|
                 date=self.metadata['date'].strftime('%Y-%m-%d'),
                 description=(self.metadata.get('description', '') or '').replace('"', '\\"'),
                 email='", "'.join(self.metadata['email']) if type(self.metadata['email']) is list else self.metadata['email'],
-                homepage=self.metadata['homepage'],
+                homepage=self.metadata['homepage'],  # TODO: might be None!
                 licenses='", "'.join(self.metadata['licenses']),
                 summary=self.metadata.get('summary', '').replace('"', '\\"')))
             for dep in self.metadata['dependencies']:
