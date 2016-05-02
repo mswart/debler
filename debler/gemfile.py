@@ -79,7 +79,7 @@ newline = lepl.Drop(lepl.Star(lepl.Space()) & lepl.Optional(line_comment) & lepl
 # define gem line
 gem = lepl.Drop('gem') & ~lepl.Space() & string
 # optional version constraints
-gem_constraints = lepl.Star(~lepl.Drop(',') & ~lepl.Space() & string) > tuple
+gem_constraints = lepl.Star(~lepl.Star(lepl.Space()) & ~lepl.Drop(',') & ~lepl.Star(lepl.Space()) & string) > tuple
 gem &= gem_constraints
 # optional keywords
 true = lepl.Literal('true') >> ret(True)
