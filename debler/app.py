@@ -145,6 +145,8 @@ class AppBuilder(BaseBuilder):
                 natives.append((deb_dep, gem_slot_name))
             if gem.constraints:
                 for constraint in gem.constraints:
+                    if ' ' not in constraint:
+                        constraint = '= ' + constraint
                     op, vers = constraint.split(' ')
                     if op == '~>':
                         up = vers.split('.')
