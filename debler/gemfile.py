@@ -110,6 +110,8 @@ class Parser():
         self.gems = {}
         self.parse_gemfile(gemfile)
         self.parse_gemlock(gemfile + '.lock')
+        # ignore bundler listing
+        self.gems.pop('bundler', None)
         self.sorted_gems = list(self.sort_gems())
 
     def sort_gems(self):
