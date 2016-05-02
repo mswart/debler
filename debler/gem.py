@@ -37,6 +37,9 @@ class GemVersion():
             elif part.startswith('xikolo'):
                 parts.append(-8)
                 continue
+            elif part.startswith('openhpi'):
+                parts.append(-8)
+                continue
             parts.append(int(part))
         return cls(parts)
 
@@ -55,6 +58,8 @@ class GemVersion():
                 needdot = False
             elif part == -8:
                 s += 'xikolo'
+            elif part == -7:
+                s += 'openhpi'
         return s
 
     def todb(self):
