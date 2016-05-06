@@ -310,6 +310,9 @@ class AppBuilder(BaseBuilder):
                     gem = self.app.gemfile.gems[name]
                     if not gem.require:
                         continue
+                    if gem.require is not True:  # specific require!
+                        f.write('    Kernel.require "{}"\n'.format(gem.require))
+                        continue
                     for require in self.gem_metadatas[name].get('require', []):
                         if 'default' in gem.envs:
                             f.write('    Kernel.require "{}"\n'.format(require))
