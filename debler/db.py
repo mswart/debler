@@ -14,7 +14,7 @@ class Database():
     def __init__(self):
         self.conn = psycopg2.connect(config.database)
 
-    def register_gem(self, name, level, native=False):
+    def register_gem(self, name, level, native=None):
         c = self.conn.cursor()
         c.execute("""INSERT INTO gems (name, level, native)
              VALUES (%s, %s, %s);""", (name, level, native))
@@ -39,7 +39,7 @@ class Database():
             for version in versions:
                 print(version['number'] + ' ' + version['created_at'])
             level = int(input('Level (1): ') or '1')
-            native = {'t': True, 'f': False, 'n': False, 'y': True, '': False}[input('Native?: ')]
+            native = {'t': True, 'f': False, 'n': False, 'y': True, '': None}[input('Native?: ')]
             self.register_gem(name, level, native=native)
             return self.gem_info(name)
         level, opts, native = result
@@ -54,6 +54,11 @@ class Database():
     def set_gem_opts(self, name, opts):
         c = self.conn.cursor()
         c.execute('UPDATE gems SET opts = %s WHERE name = %s', (json.dumps(opts), name))
+        self.conn.commit()
+
+    def set_gem_native(self, name, native):
+        c = self.conn.cursor()
+        c.execute('UPDATE gems SET native = %s WHERE name = %s', (native, name))
         self.conn.commit()
 
     def scheduled_builds(self):

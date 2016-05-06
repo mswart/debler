@@ -168,6 +168,9 @@ class GemBuilder(BaseBuilder):
                 build_deps.append('ruby{}-dev'.format(ruby))
 
         level, opts, native, _ = self.db.gem_info(self.gem_name)
+        if native is None:  # auto-detect on first build
+            native = bool(len(exts) > 0)
+            self.db.set_gem_native(self.gem_name, native)
         assert native is (len(exts) > 0), 'Native flag value is wrong!'
         build_deps.extend(opts.get('default', {}).get('builddeps', []))
         control_file = open(self.debian_file('control'), 'wb')

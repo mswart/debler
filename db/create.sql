@@ -6,7 +6,7 @@ CREATE TABLE gems (
   name VARCHAR(60) UNIQUE PRIMARY KEY,
   level INT NOT NULL DEFAULT 1,
   opts JSON NOT NULL DEFAULT '{}',
-  native boolean NOT NULL default false
+  native boolean
 );
 
 CREATE TABLE packages (
