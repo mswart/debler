@@ -141,7 +141,7 @@ class Database():
             self._gem_rebuild(message, *data)
 
     def _gem_rebuild(self, message, name, slot, version, revision, dist):
-        print('rebuild name:{} in version {}-{}'.format(
+        print('rebuild {}:{} in version {}-{}'.format(
             name, '.'.join(str(s) for s in slot),
             '.'.join(str(v) for v in version), revision))
         self.create_gem_version(
