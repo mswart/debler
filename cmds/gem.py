@@ -24,7 +24,7 @@ def run(args):
         _, opts, _, _ = db.gem_info(gem)
         opts.setdefault('default', {})
         if args.add:
-            message = 'rebuild to include "{}" dir into package'.format(args.add)
+            message = 'rebuild to include addition dirs into package: {}'.format(', '.join(args.add))
             opts['default'].setdefault('extra_dirs', [])
             opts['default']['extra_dirs'].extend(args.add)
         elif args.so_subdir:
