@@ -23,13 +23,17 @@ def run(args):
     for gem in args.gem:
         _, opts, _, _ = db.gem_info(gem)
         opts.setdefault('default', {})
-        if args.add_dir:
-            message = 'rebuild to include "{}" dir into package'.format(args.add_dir)
+        if args.add:
+            message = 'rebuild to include "{}" dir into package'.format(args.add)
             opts['default'].setdefault('extra_dirs', [])
-            opts['default']['extra_dirs'].append(args.add_dir)
+            opts['default']['extra_dirs'].extend(args.add)
         elif args.so_subdir:
-            message = 'rebuild to move so libs into "{}" subdir'.format(args.add_dir)
+            message = 'rebuild to move so libs into "{}" subdir'.format(args.so_subdir)
             opts['default']['so_subdir'] = args.so_subdir
+        elif args.run_dep:
+            message = 'rebuild to add new runtime dependencies: {}'.format(', '.join(args.run_dep))
+            opts['default'].setdefault('rundeps', [])
+            opts['default']['rundeps'].extend(args.run_dep)
         db.set_gem_opts(gem, opts)
         db.gem_rebuild(gem, message)
 
@@ -37,10 +41,12 @@ def run(args):
 def register(subparsers):
     parser = subparsers.add_parser('gem')
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--add-dir',
-                       help='add a other dir as required + schedule rebuilds of this gem')
+    group.add_argument('--add', action='append', default=[],
+                       help='add another dir or file as required + schedule rebuilds of this gem')
     group.add_argument('--so-subdir',
                        help='set the so subdir + schedule rebuilds of this gem')
+    group.add_argument('--run-dep', action='append', default=[],
+                       help='register a new runtime dependency')
     group.add_argument('--schedule', action='store_true',
                        help='schedule building of gem:version tasks')
     parser.add_argument('gem', nargs='*', help='limit list of gems to rebuild')
