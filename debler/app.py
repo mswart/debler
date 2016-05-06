@@ -305,6 +305,7 @@ class AppBuilder(BaseBuilder):
             with open(self.debian_file('lib', 'bundler.rb'), 'w') as f:
                 f.write('class Bundler\n')
                 f.write('  def self.require(*groups)\n')
+                f.write('    groups = groups.map(&:to_s)\n')
 
                 for name in self.app.gemfile.sorted_gems:
                     gem = self.app.gemfile.gems[name]
