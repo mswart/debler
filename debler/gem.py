@@ -217,7 +217,7 @@ class GemBuilder(BaseBuilder):
                     versioned_deps = True
                     up = version[1]['version'].split('.')
                     if req_level > 0:
-                        req += '-' + '.'.join(str(v) for v in slots[0][:req_level])
+                        req += '-' + '.'.join(str(v) for v in sorted(slots)[0][:req_level])
                     deps.append('{} (>= {})'.format(req, version[1]['version']))
                     if len(up) < 2:
                         continue
@@ -285,6 +285,11 @@ class GemBuilder(BaseBuilder):
             changes.write_to_open_file(f)
 
     def generate_rules_file(self):
+        metadata = {
+            'binaries': [],
+            'require_paths': self.metadata['require_paths'],
+            'require': None
+        }
         rules = {}
         rules['build'] = []
         rules['install'] = []
@@ -383,12 +388,25 @@ Gem::Specification.new do |s|
                 f.write(')\n')
             f.write('end\n')
 
+        current_level = None
         with open(self.debian_file(self.deb_name + '.install'), 'w') as f:
             f.write('debian/{gem}.gemspec /usr/share/rubygems-debler/{name}/\n'.format(
                 gem=self.gem_name, name=self.own_name))
             with tarfile.open(self.src_file) as t, tarfile.open(fileobj=t.extractfile('data.tar.gz')) as dt:
                 members = dt.getmembers()
                 for member in members:
+                    # search for binaries
+                    if self.metadata['bindir'] and member.name.startswith(self.metadata['bindir']):
+                        metadata['binaries'].append(member.name)
+                    # search for require entry files (top level file ...)
+                    for path in self.metadata['require_paths']:
+                        if member.name.startswith(path) and member.name.endswith('.rb'):
+                            parts = member.name.split('/')
+                            if current_level is None or len(parts) < current_level:
+                                metadata['require'] = [member.name[len(path)+1:-3]]  # not extension
+                                current_level = len(parts)
+                            elif len(parts) == current_level:  # should not happend
+                                metadata['require'].append(member.name[len(path)+1:-3])  # no extension + require path
                     for path in self.metadata['require_paths'] + [self.metadata['bindir'], 'data', 'vendor'] + opts.get('default', {}).get('extra_dirs', []):
                         if member.name.startswith(path):
                             break
@@ -398,6 +416,7 @@ Gem::Specification.new do |s|
                         name=self.own_name,
                         file=member.name,
                         dir=os.path.dirname(member.name)))
+        self.db.set_gem_slot_metadata(self.gem_name, self.gem_slot.todb(), metadata)
 
     def extension_list(self):
         _, opts, _, _ = self.db.gem_info(self.gem_name)

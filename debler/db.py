@@ -45,10 +45,12 @@ class Database():
         level, opts, native = result
         if type(opts) is str:
             opts = json.loads(opts)
-        slots = []
-        c.execute('SELECT slot FROM packages WHERE name = %s', (name, ))
-        for slot in c:
-            slots.append(tuple(slot[0]))
+        slots = {}
+        c.execute('SELECT slot, metadata FROM packages WHERE name = %s', (name, ))
+        for slot, metadata in c:
+            if type(metadata) is str:
+                metadata = json.loads(metadata)
+            slots[tuple(slot)] = metadata
         return level, opts, native, slots
 
     def set_gem_opts(self, name, opts):
@@ -59,6 +61,12 @@ class Database():
     def set_gem_native(self, name, native):
         c = self.conn.cursor()
         c.execute('UPDATE gems SET native = %s WHERE name = %s', (native, name))
+        self.conn.commit()
+
+    def set_gem_slot_metadata(self, name, slot, metadata):
+        c = self.conn.cursor()
+        c.execute('UPDATE packages SET metadata = %s WHERE name = %s AND slot = %s',
+                  (json.dumps(metadata), name, list(slot)))
         self.conn.commit()
 
     def scheduled_builds(self):

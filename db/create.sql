@@ -12,6 +12,7 @@ CREATE TABLE gems (
 CREATE TABLE packages (
   name VARCHAR(60) REFERENCES gems(name) ON DELETE RESTRICT,
   slot INT[],
+  metadata JSON NOT NULL DEFAULT '{}',
   PRIMARY KEY (name, slot)
 );
 
