@@ -259,7 +259,7 @@ class AppBuilder(BaseBuilder):
                     f.write('else\n')
                     f.write('  binaries = {\n')
                     for exe, path, requires in self.binaries:
-                        f.write('    \'{}\' => [{}, "{}"],\n'.format(exe, path, '", "'.join(requires)))
+                        f.write('    \'{}\' => ["{}", ["{}"]],\n'.format(exe, path, '", "'.join(requires)))
                     f.write('  }\n')
                     f.write('  if binaries.key? exe\n')
                     f.write('    binaries[exe][1].each do |torequire|\n')
