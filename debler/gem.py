@@ -38,8 +38,10 @@ class GemVersion():
                 parts.append(-8)
                 continue
             elif part.startswith('openhpi'):
-                parts.append(-8)
+                parts.append(-7)
                 continue
+            elif part.startswith('alpha'):
+                parts.append(-19)
             parts.append(int(part))
         return cls(parts)
 
