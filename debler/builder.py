@@ -48,7 +48,7 @@ Licence: See LICENCE file
 
     def create_source_package(self):
         os.chdir(self.pkg_dir)
-        subprocess.check_call(['dpkg-buildpackage', '-S', '-d'])
+        subprocess.check_call(['dpkg-buildpackage', '-S', '-sa', '-d'])
 
     def upload_source_package(self):
         changes = '{}_{}_source.changes'.format(self.deb_name, self.deb_version)
