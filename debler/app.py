@@ -119,9 +119,10 @@ class AppBuilder(BaseBuilder):
         control['Package'] = self.deb_name
         control['Architecture'] = 'all'
         self.load_paths = {'all': []}
-        self.bin_paths = []
         self.installs = {'all': []}
         self.symlinks = {'all': []}
+        self.gem_metadatas = {}
+        self.binaries = []
         deps = []
         natives = []
         for name, gem in self.app.gems.items():
@@ -132,15 +133,20 @@ class AppBuilder(BaseBuilder):
                 continue
             level, builddeps, native, slots = self.db.gem_info(name)
             slot = tuple(gem.version.limit(level).todb())
+            metadata = slots[slot]
+            self.gem_metadatas[name] = metadata
             gem_slot_name = name + '-' + '.'.join([str(s) for s in slot])
             self.symlinks['all'].append((
                 '/usr/share/rubygems-debler/{}/{}.gemspec'.format(gem_slot_name, name),
                 '/usr/share/{}/.debler/gems/specifications/{}-{}.gemspec'.format(self.app.name, name, str(gem.version))
             ))
             deb_dep = self.gemnam2deb(gem_slot_name)
-            self.load_paths['all'].append('/usr/share/rubygems-debler/{name}/{}/'.format('lib', name=gem_slot_name))
-            self.bin_paths.append('/usr/share/rubygems-debler/{name}/{}/'.format('bin', name=gem_slot_name))
-            self.bin_paths.append('/usr/share/rubygems-debler/{name}/{}/'.format('exe', name=gem_slot_name))
+            for path in metadata.get('require_paths', []):
+                self.load_paths['all'].append('/usr/share/rubygems-debler/{name}/{}/'.format(path, name=gem_slot_name))
+            for binary in metadata['binaries']:
+                self.binaries.append((os.path.basename(binary),
+                                      os.path.join('/usr/share/rubygems-debler', gem_slot_name, binary),
+                                      metadata.get('require', [])))
             if native:
                 natives.append((deb_dep, gem_slot_name))
             if gem.constraints:
@@ -251,13 +257,16 @@ class AppBuilder(BaseBuilder):
                     f.write('if File.exist? exe\n')
                     f.write('  load exe\n')
                     f.write('else\n')
-                    f.write('  path = [\n')
-                    for bin_path in self.bin_paths:
-                        f.write('    \'{}\',\n'.format(bin_path))
-                    f.write('  ].find do |dir|\n')
-                    f.write('      File.exist? "#{dir}/#{exe}"\n')
+                    f.write('  binaries = {\n')
+                    for exe, path, requires in self.binaries:
+                        f.write('    \'{}\' => [{}, "{}"],\n'.format(exe, path, '", "'.join(requires)))
+                    f.write('  }\n')
+                    f.write('  if binaries.key? exe\n')
+                    f.write('    binaries[exe][1].each do |torequire|\n')
+                    f.write('      require torequire\n')
+                    f.write('    end\n')
+                    f.write('    load binaries[exe][0]\n')
                     f.write('  end\n')
-                    f.write('  load path + \'/\' + exe\n')
                     f.write('end\n')
                 self.installs[ruby + '.0'].append((os.path.join('debian', 'bin', self.app.name + ruby), '/usr/bin'))
                 os.chmod(self.debian_file('bin', self.app.name + ruby), 0o755)
@@ -295,26 +304,17 @@ class AppBuilder(BaseBuilder):
 
             with open(self.debian_file('lib', 'bundler.rb'), 'w') as f:
                 f.write('class Bundler\n')
-                f.write('  def self.load_gem(name)\n')
-                f.write('    Kernel.require name\n')
-                f.write('  rescue LoadError\n')
-                f.write('    if name.include? \'-\'\n')
-                f.write('      Kernel.require name.gsub(\'-\', \'/\')\n')
-                f.write('    else\n')
-                f.write('      raise\n')
-                f.write('    end\n')
-                f.write('  end\n')
-                f.write('\n')
                 f.write('  def self.require(*groups)\n')
 
                 for name in self.app.gemfile.sorted_gems:
                     gem = self.app.gemfile.gems[name]
                     if not gem.require:
                         continue
-                    if 'default' in gem.envs:
-                        f.write('    load_gem "{}"\n'.format(name))
-                    else:
-                        f.write('    load_gem "{}" unless (groups & ["{}"]).empty?\n'.format(name, '", "'.join(gem.envs)))
+                    for require in self.gem_metadatas[name].get('require', []):
+                        if 'default' in gem.envs:
+                            f.write('    Kernel.require "{}"\n'.format(require))
+                        else:
+                            f.write('    Kernel.require "{}" unless (groups & ["{}"]).empty?\n'.format(require, '", "'.join(gem.envs)))
                 f.write('  end\n')
                 f.write('end\n')
 
