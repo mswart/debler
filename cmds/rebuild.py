@@ -7,7 +7,7 @@ def run(args):
     if args.format_rebuild:
         db.gem_format_rebuild(args.message)
     elif args.simple:
-        for gem in args.gems:
+        for gem in args.gem:
             db.gem_rebuild(gem, args.message)
 
 
