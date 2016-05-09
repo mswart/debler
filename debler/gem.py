@@ -217,7 +217,8 @@ class GemBuilder(BaseBuilder):
                     versioned_deps = True
                     up = version[1]['version'].split('.')
                     if req_level > 0:
-                        req += '-' + '.'.join(str(v) for v in sorted(slots)[0][:req_level])
+                        # TODO thing about this / fix?
+                        req += '-' + '.'.join(up[:req_level])
                     deps.append('{} (>= {})'.format(req, version[1]['version']))
                     if len(up) < 2:
                         continue
