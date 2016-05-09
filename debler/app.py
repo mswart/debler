@@ -314,7 +314,7 @@ class AppBuilder(BaseBuilder):
                     if gem.require is not True:  # specific require!
                         f.write('    Kernel.require "{}"\n'.format(gem.require))
                         continue
-                    for require in self.gem_metadatas[name].get('require', []):
+                    for require in self.gem_metadatas.get(name, {'require': [name.replace('-', '/')]}).get('require', []):
                         if 'default' in gem.envs:
                             f.write('    Kernel.require "{}"\n'.format(require))
                         else:
