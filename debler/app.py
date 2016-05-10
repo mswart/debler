@@ -321,8 +321,10 @@ class AppBuilder(BaseBuilder):
                             f.write('    Kernel.require "{}" unless (groups & ["{}"]).empty?\n'.format(require, '", "'.join(gem.envs)))
                 f.write('  end\n')
                 f.write('\n')
-                f.write('  def self.setup(*groups)\n')
-                f.write('     require *groups\n')
+                f.write('  def self.setup(*args)\n')
+                f.write('  end\n')
+                f.write('  def self.with_clean_env\n')
+                f.write('    yield\n')
                 f.write('  end\n')
                 f.write('end\n')
 
