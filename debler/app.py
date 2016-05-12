@@ -253,6 +253,7 @@ class AppBuilder(BaseBuilder):
                     f.write('File.readlines("/usr/share/{}/.debler/load_paths/{}.0").each do |dir|\n'.format(self.app.name, ruby))
                     f.write('  $LOAD_PATH << dir.strip\n')
                     f.write('end\n')
+                    f.write('require "bundler"\n')
                     f.write('exe = ARGF.argv.shift\n')
                     f.write('if File.exist? exe\n')
                     f.write('  load exe\n')
