@@ -166,6 +166,8 @@ class Parser():
                 continue
             name, version = line.strip().split(' ', 1)
             version = version[1:-1]
+            if version.endswith('-java'):
+                continue
             if name in self.gems:
                 self.gems[name].version = GemVersion.fromstr(version)
             else:
@@ -174,7 +176,9 @@ class Parser():
             current_gem = self.gems[name]
 
     def parse_PLATFORMS(self, lines):
-        assert lines[0].strip() == 'ruby'
+        platforms = [s.strip() for s in lines]
+        for platform in platforms:
+            assert platform in ['ruby', 'java']
 
     def parse_DEPENDENCIES(self, lines):
         self.dependencies = {}
