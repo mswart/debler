@@ -1,8 +1,13 @@
 #!/usr/bin/env python3
 import os
+import sys
 import subprocess
 
 from debler import config
+
+
+class BuildFailError(Exception):
+    pass
 
 
 class BaseBuilder():
@@ -65,12 +70,16 @@ Licence: See LICENCE file
     def build(self):
         os.chdir(self.slot_dir)
 
-        subprocess.check_call(['sbuild',
-                               '--dist', config.distribution,
-                               '--keyid', config.keyid,
-                               '--maintainer', config.maintainer,
-                               '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
-
+        try:
+            subprocess.check_call(['sbuild',
+                                   '--dist', config.distribution,
+                                   '--keyid', config.keyid,
+                                   '--maintainer', config.maintainer,
+                                   '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
+        except subprocess.CalledProcessError:
+            print('Could not build package:', file=sys.stderr)
+            subprocess.check_call(['cat', '{}_{}_amd64.build'.format(self.deb_name, self.deb_version)])
+            raise BuildFailError()
         changes = '{}_{}_amd64.changes'.format(self.deb_name, self.deb_version)
         subprocess.check_call(['dput', self.package_upload, os.path.join(self.tmp_dir, changes)])
 

@@ -1,7 +1,8 @@
+import sys
 from tempfile import TemporaryDirectory
 
 from debler.app import AppInfo, AppBuilder
-from debler.builder import publish
+from debler.builder import publish, BuildFailError
 from debler.db import Database
 
 
@@ -16,7 +17,10 @@ def run(args):
     with TemporaryDirectory() as d:
         builder = AppBuilder(db, d, app)
         builder.generate()
-        builder.build()
+        try:
+            builder.build()
+        except BuildFailError:
+            sys.exit(5)
 
     publish('app')
 

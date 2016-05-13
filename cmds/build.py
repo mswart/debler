@@ -4,7 +4,7 @@ import sys
 
 from debler.db import Database
 from debler.gem import GemBuilder, GemVersion
-from debler.builder import publish
+from debler.builder import publish, BuildFailError
 
 
 def header(content, color=33):
@@ -35,6 +35,12 @@ def run(args):
             db.update_build(*data, state='finished')
             header(task, color=32)
             successful += 1
+        except BuildFailError:
+            db.update_build(*data, state='failed')
+            failed += 1
+            header(task, color=31)
+            if args.fail_fast:
+                break
         except Exception:
             db.update_build(*data, state='failed')
             failed += 1
