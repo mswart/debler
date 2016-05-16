@@ -10,6 +10,7 @@ from debian.deb822 import Deb822, Dsc
 
 
 from debler.gemfile import Parser as GemfileParser
+from debler.npm import Parser as NpmParser
 from debler.builder import BaseBuilder
 from debler import config
 
@@ -17,7 +18,8 @@ from debler import config
 class AppInfo():
     def __init__(self, db, name, version, basedir, *, gemfile=None,
                  homepage=None, description=None, executables=[], dirs=[],
-                 bundler_laucher=False, files=[], default_env=None):
+                 bundler_laucher=False, files=[], default_env=None,
+                 npm=None):
         self.db = db
         self.name = name
         if type(version) is list:
@@ -27,6 +29,10 @@ class AppInfo():
         self.basedir = basedir
         if gemfile is not None:
             self.gemfile = GemfileParser(os.path.join(self.basedir, gemfile))
+        if npm is not None:
+            self.npm = NpmParser.parse(self.basedir, npm)
+        else:
+            self.npm = None
         self.homepage = homepage
         self.description = description
         self.executables = executables
@@ -125,6 +131,7 @@ class AppBuilder(BaseBuilder):
         self.binaries = []
         deps = []
         natives = []
+
         for name, gem in self.app.gems.items():
             if not gem.version:  # included by path
                 assert gem.path is not None, 'gem "{!s}" does not have any version, but no path: {!r}!'.format(gem.name, gem)
@@ -166,6 +173,33 @@ class AppBuilder(BaseBuilder):
             else:
                 deps.append(deb_dep)
         deps.append(' | '.join([self.deb_name + '-ruby' + ruby for ruby in config.rubies]))
+
+        if self.app.npm:
+            for pkg, constraint in self.app.npm.devDependencies.items():
+                if not constraint[0].isdigit():
+                    op = constraint[0]
+                    version = constraint[1:]
+                else:
+                    op = '='
+                    version = constraint
+                if op == '^':
+                    if version.replace('.0', '') == version.split('.')[0]:
+                        deps.append('{}-{}'.format(self.npm2deb(pkg), version.split('.')[0]))
+                    else:
+                        deps.append('{}-{} (>= {})'.format(self.npm2deb(pkg), version.split('.')[0], version))
+                    self.symlinks['all'].append((
+                        '/usr/share/node-debler/{}-{}'.format(pkg, version.split('.')[0]),
+                        '/usr/share/{}/{}node_modules/{}'.format(self.app.name, self.app.npm.dir, pkg)
+                    ))
+                elif op == '=':
+                    deps.append('{}-{}'.format(self.npm2deb(pkg), version))
+                    self.symlinks['all'].append((
+                        '/usr/share/node-debler/{}-{}'.format(pkg, version),
+                        '/usr/share/{}/{}node_modules/{}'.format(self.app.name, self.app.npm.dir, pkg)
+                    ))
+                else:
+                    raise NotImplementedError('unknown npm operator {} in ({}: {})'.format(op, pkg, constraint))
+
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')
 
