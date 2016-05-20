@@ -29,6 +29,8 @@ class AppInfo():
         self.basedir = basedir
         if gemfile is not None:
             self.gemfile = GemfileParser(os.path.join(self.basedir, gemfile))
+        else:
+            self.gemfile = None
         if npm is not None:
             self.npm = NpmParser.parse(self.basedir, npm)
         else:
@@ -47,6 +49,12 @@ class AppInfo():
         if 'basedir' not in data:
             data['basedir'] = os.path.dirname(os.path.realpath(filename))
         return cls(db, **data)
+
+    def schedule_dep_builds(self):
+        if self.gemfile is not None:
+            self.schedule_gemdeps_builds()
+        if self.npm is not None:
+            self.npm.schedule_deps_builds(self.db)
 
     def schedule_gemdeps_builds(self):
         for name, gem in self.gems.items():
@@ -175,30 +183,10 @@ class AppBuilder(BaseBuilder):
         deps.append(' | '.join([self.deb_name + '-ruby' + ruby for ruby in config.rubies]))
 
         if self.app.npm:
-            for pkg, constraint in self.app.npm.devDependencies.items():
-                if not constraint[0].isdigit():
-                    op = constraint[0]
-                    version = constraint[1:]
-                else:
-                    op = '='
-                    version = constraint
-                if op == '^':
-                    if version.replace('.0', '') == version.split('.')[0]:
-                        deps.append('{}-{}'.format(self.npm2deb(pkg), version.split('.')[0]))
-                    else:
-                        deps.append('{}-{} (>= {})'.format(self.npm2deb(pkg), version.split('.')[0], version))
-                    self.symlinks['all'].append((
-                        '/usr/share/node-debler/{}-{}'.format(pkg, version.split('.')[0]),
-                        '/usr/share/{}/{}node_modules/{}'.format(self.app.name, self.app.npm.dir, pkg)
-                    ))
-                elif op == '=':
-                    deps.append('{}-{}'.format(self.npm2deb(pkg), version))
-                    self.symlinks['all'].append((
-                        '/usr/share/node-debler/{}-{}'.format(pkg, version),
-                        '/usr/share/{}/{}node_modules/{}'.format(self.app.name, self.app.npm.dir, pkg)
-                    ))
-                else:
-                    raise NotImplementedError('unknown npm operator {} in ({}: {})'.format(op, pkg, constraint))
+            base_dir = '/usr/share/{}/{}'.format(self.app.name, self.app.npm.dir)
+            new_deps, new_symlinks = self.app.npm.needed_relations(base_dir)
+            deps.extend(new_deps)
+            self.symlinks['all'].extend(new_symlinks)
 
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')

@@ -17,18 +17,18 @@ class Database():
     def register_gem(self, name, level, native=None):
         c = self.conn.cursor()
         c.execute("""INSERT INTO gems (name, level, native)
-             VALUES (%s, %s, %s);""", (name, level, native))
+             VALUES (%s, %s, %s);""", ('rubygem:' + name, level, native))
         self.conn.commit()
 
     def create_gem_slot(self, name, slot):
         c = self.conn.cursor()
         c.execute("""INSERT INTO packages (name, slot)
-             VALUES (%s, %s);""", (name, list(slot)))
+             VALUES (%s, %s);""", ('rubygem:' + name, list(slot)))
         self.conn.commit()
 
     def gem_info(self, name):
         c = self.conn.cursor()
-        c.execute('SELECT level, opts, native FROM gems WHERE name = %s', (name, ))
+        c.execute('SELECT level, opts, native FROM gems WHERE name = %s', ('rubygem:' + name, ))
         result = c.fetchone()
         if result is None:
             print('Configure {}:'.format(name))
@@ -46,47 +46,92 @@ class Database():
         if type(opts) is str:
             opts = json.loads(opts)
         slots = {}
-        c.execute('SELECT slot, metadata FROM packages WHERE name = %s', (name, ))
+        c.execute('SELECT slot, metadata FROM packages WHERE name = %s', ('rubygem:' + name, ))
         for slot, metadata in c:
             if type(metadata) is str:
                 metadata = json.loads(metadata)
             slots[tuple(slot)] = metadata
         return level, opts, native, slots
 
+    def register_npm(self, name):
+        c = self.conn.cursor()
+        c.execute("""INSERT INTO gems (name, level, native)
+                     VALUES (%s, %s, %s);""", ('npm:' + name, 1, False))
+        self.conn.commit()
+
+    def create_npm_slot(self, name, slot):
+        c = self.conn.cursor()
+        c.execute("""INSERT INTO packages (name, slot)
+             VALUES (%s, %s);""", ('npm:' + name, list(slot)))
+        self.conn.commit()
+
+    def npm_slot_versions(self, name, slot):
+        c = self.conn.cursor()
+        c.execute('''SELECT version
+                     FROM package_versions
+                     WHERE name = %s AND slot = %s
+                     GROUP BY version
+                     ORDER BY version ASC''', ('npm:' + name, list(slot)))
+        return tuple(tuple(version[0]) for version in c)
+
+    def npm_info(self, name):
+        c = self.conn.cursor()
+        c.execute('SELECT opts FROM gems WHERE name = %s', ('npm:' + name, ))
+        result = c.fetchone()
+        if result is None:
+            self.register_npm(name)
+            return self.npm_info(name)
+        opts = result[0]
+        if type(opts) is str:
+            opts = json.loads(opts)
+        slots = {}
+        c.execute('SELECT slot, metadata FROM packages WHERE name = %s', ('npm:' + name, ))
+        for slot, metadata in c:
+            if type(metadata) is str:
+                metadata = json.loads(metadata)
+            slots[tuple(slot)] = metadata
+        return opts, slots
+
     def set_gem_opts(self, name, opts):
         c = self.conn.cursor()
-        c.execute('UPDATE gems SET opts = %s WHERE name = %s', (json.dumps(opts), name))
+        c.execute('UPDATE gems SET opts = %s WHERE name = %s', (json.dumps(opts), 'rubygem:' + name))
         self.conn.commit()
 
     def set_gem_native(self, name, native):
         c = self.conn.cursor()
-        c.execute('UPDATE gems SET native = %s WHERE name = %s', (native, name))
+        c.execute('UPDATE gems SET native = %s WHERE name = %s', (native, 'rubygem:' + name))
         self.conn.commit()
 
     def set_gem_slot_metadata(self, name, slot, metadata):
         c = self.conn.cursor()
         c.execute('UPDATE packages SET metadata = %s WHERE name = %s AND slot = %s',
-                  (json.dumps(metadata), name, list(slot)))
+                  (json.dumps(metadata), 'rubygem:' + name, list(slot)))
         self.conn.commit()
 
-    def scheduled_builds(self):
+    def _iter_builds(self, state):
         c = self.conn.cursor()
         while True:
-            c.execute('''SELECT name, slot, version, revision
+            c.execute('''SELECT split_part(name, ':', 1), split_part(name, ':', 2), slot, version, revision
                          FROM package_versions
                          WHERE state = %s
-                         LIMIT 1''', ('scheduled', ))
+                         LIMIT 1''', (state, ))
             pkg = c.fetchone()
             if pkg:
                 yield pkg
             else:
                 break
 
-    def update_build(self, name, slot, version, revision, state):
+    def scheduled_builds(self):
+        yield from self._iter_builds('scheduled')
+
+    def failed_builds(self):
+        yield from self._iter_builds('failed')
+
+    def update_build(self, pkger, name, slot, version, revision, state):
         c = self.conn.cursor()
         c.execute('UPDATE package_versions SET state = %s'
                   + ' WHERE name = %s AND slot = %s AND version = %s AND revision = %s',
-                  (state, name, slot, version, revision))
+                  (state, pkger + ':' + name, slot, version, revision))
         self.conn.commit()
 
     def create_gem_version(self, name, slot, *, version, revision,
@@ -96,30 +141,41 @@ class Database():
         c.execute("""INSERT INTO package_versions (name, slot, version, revision,
                 format, scheduled_at, changelog, distribution)
              VALUES (%s, %s, %s, %s, %s, %s, %s, %s);""",
-                  (name, list(slot), version, revision, format or config.gem_format,
+                  ('rubygem:' + name, list(slot), version, revision, format or config.gem_format,
                    now, changelog, distribution))
         self.conn.commit()
 
-    def changelog_entries(self, name, slot, until_version):
+    def schedule_npm_version(self, name, slot, *, version, revision,
+                             format=None, changelog, distribution):
+        now = datetime.now(tz=tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z')
+        c = self.conn.cursor()
+        c.execute("""INSERT INTO package_versions (name, slot, version, revision,
+                format, scheduled_at, changelog, distribution)
+             VALUES (%s, %s, %s, %s, %s, %s, %s, %s);""",
+                  ('npm:' + name, list(slot), version, revision, format or config.gem_format,
+                   now, changelog, distribution))
+        self.conn.commit()
+
+    def changelog_entries(self, pkger, name, slot, until_version):
         c = self.conn.cursor()
         c.execute("""SELECT version, revision, scheduled_at, changelog, distribution
             FROM package_versions
             WHERE name=%s AND slot = %s AND version <= %s
-            ORDER BY version ASC, revision ASC;""", (name, list(slot), list(until_version)))
+            ORDER BY version ASC, revision ASC;""", (pkger + ':' + name, list(slot), list(until_version)))
         for version, revision, scheduled_at, changelog, distribution in c:
             yield (GemVersion(version), revision, scheduled_at, changelog, distribution)
 
     def gem_format_rebuild(self, changelog):
         c = self.conn.cursor()
-        c.execute("""SELECT name, slot, version, revision, dist
+        c.execute("""SELECT substring(name from 9), slot, version, revision, dist
             FROM (
-                SELECT DISTINCT name, slot,
+                SELECT DISTINCT substring(name from 9), slot,
                     first_value(version) OVER w AS version,
                     first_value(revision) OVER w AS revision,
                     first_value(distribution) OVER w AS dist,
                     first_value(format) over w AS format
                 FROM package_versions
-                WINDOW w AS (PARTITION BY name, slot ORDER BY version DESC, revision DESC)
+                WINDOW w AS (PARTITION BY substring(name from 9), slot ORDER BY version DESC, revision DESC)
             ) AS w
             WHERE format < %s;""", (list(config.gem_format), ))
         for data in c:
@@ -127,16 +183,16 @@ class Database():
 
     def gem_rebuild(self, name, message):
         c = self.conn.cursor()
-        c.execute("""SELECT name, slot, version, revision, dist
+        c.execute("""SELECT substring(name from 9), slot, version, revision, dist
             FROM (
-                SELECT DISTINCT name, slot,
+                SELECT DISTINCT substring(name from 9), slot,
                     first_value(version) OVER w AS version,
                     first_value(revision) OVER w AS revision,
                     first_value(distribution) OVER w AS dist
                 FROM package_versions
-                WINDOW w AS (PARTITION BY name, slot ORDER BY version DESC, revision DESC)
+                WINDOW w AS (PARTITION BY substring(name from 9), slot ORDER BY version DESC, revision DESC)
             ) AS w
-            WHERE name = %s""", (name, ))
+            WHERE name = %s""", ('rubygem:' + name, ))
         for data in c:
             self._gem_rebuild(message, *data)
 
