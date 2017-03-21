@@ -275,7 +275,7 @@ class GemBuilder(BaseBuilder):
 
     def generate_changelog_file(self):
         changes = Changelog()
-        for version, revision, scheduled_at, change, distribution in self.db.changelog_entries(self.gem_name, self.gem_slot.todb(), self.gem_version.todb()):
+        for version, revision, scheduled_at, change, distribution in self.db.changelog_entries('rubygem', self.gem_name, self.gem_slot.todb(), self.gem_version.todb()):
             deb_version = str(version) + '-' + str(revision)
             changes.new_block(package=self.deb_name, version=deb_version,
                               distributions=distribution, urgency='low',
