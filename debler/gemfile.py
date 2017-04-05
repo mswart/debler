@@ -76,6 +76,9 @@ symbol = lepl.Drop(':') & lepl.Star(lepl.AnyBut('\':\t\n ')) > build_str
 line_comment = lepl.Literal('#') & lepl.Star(lepl.AnyBut('\n'))
 newline = lepl.Drop(lepl.Star(lepl.Space()) & lepl.Optional(line_comment) & lepl.Literal('\n') & lepl.Star(lepl.Space()))
 
+# define ruby line
+ruby = lepl.Drop('ruby') & ~lepl.Space() & string >> ret(None)
+
 # define gem line
 gem = lepl.Drop('gem') & ~lepl.Space() & string
 # optional version constraints
@@ -102,7 +105,7 @@ group = group_start & group_content & group_end > expand(build_gems)
 
 source = ~lepl.Literal('source') & ~lepl.Space() & string > expand(Source)
 
-parser = lepl.Star(source | gem | group | newline)
+parser = lepl.Star(source | ruby | gem | group | newline)
 
 
 class Parser():
@@ -148,7 +151,7 @@ class Parser():
                 continue
             if line[0] != ' ':
                 if current_state is not None:
-                    getattr(self, 'parse_' + current_state)(current_lines)
+                    getattr(self, 'parse_' + current_state.replace(' ', '_'))(current_lines)
                 current_state = line.strip()
                 current_lines = []
             else:
@@ -193,6 +196,9 @@ class Parser():
             self.dependencies[name] = const
 
     def parse_PATH(self, lines):
+        pass
+
+    def parse_RUBY_VERSION(self, lines):
         pass
 
 if __name__ == '__main__':
