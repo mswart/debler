@@ -235,7 +235,7 @@ class GemBuilder(BaseBuilder):
                         # e.g. ~> 1.0, and slots 1.5, 1.6, 1.7, 1.8
                         # depend on any of same (but prefer newer ones)
                         possible_deps = []
-                        required_prefix = [int(v) for v in up[:fixed_components]]
+                        required_prefix = tuple(int(v) for v in up[:fixed_components])
                         for slot in reversed(sorted(slots)):
                             if required_prefix != slot[:fixed_components]:
                                 continue
