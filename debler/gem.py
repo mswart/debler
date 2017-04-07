@@ -215,17 +215,31 @@ class GemBuilder(BaseBuilder):
                     version[1]['version'] = version[1]['version'][:version[1]['version'].find('.rc')]
                 if version[0] == '~>':
                     versioned_deps = True
-                    up = version[1]['version'].split('.')
-                    if req_level > 0:
-                        # TODO thing about this / fix?
+                    min_version = version[1]['version']
+                    up = min_version.split('.')
+                    fixed_components = len(up) - 1
+                    if fixed_components > req_level:
+                        # we stay within one slot
+                        # e.g. ~> 1.5 and slots = (0, 1, 2)
                         req += '-' + '.'.join(up[:req_level])
-                    deps.append('{} (>= {})'.format(req, version[1]['version']))
-                    if len(up) < 2:
-                        continue
-                    # TODO: skip if we leave our current slot
-                    up[-1] = '0'
-                    up[-2] = str(int(up[-2]) + 1)
-                    deps.append('{} (<= {})'.format(req, '.'.join(up)))
+                        deps.append('{} (>= {})'.format(req, min_version))
+                        up[-1] = '0'
+                        up[-2] = str(int(up[-2]) + 1)
+                        deps.append('{} (<< {})'.format(req, '.'.join(up)))
+                    elif fixed_components == req_level:
+                        # we are pinned to a specific slot
+                        # e.g. ~> 1.5.1 and slots 1.5, 1.6
+                        deps.append('{}-{}'.format(req, '.'.join(up[:fixed_components])))
+                    elif fixed_components < req_level:
+                        # multiple slots fulfil the requirements
+                        # e.g. ~> 1.0, and slots 1.5, 1.6, 1.7, 1.8
+                        # depend on any of same (but prefer newer ones)
+                        possible_deps = []
+                        for slot in reversed(sorted(slots)):
+                            if up[:fixed_components] != slot[:fixed_components]:
+                                continue
+                            possible_deps.append('{}-{}'.format(req, '.'.join(slots)))
+                        deps.append(' | '.join(possible_deps))
                 else:
                     if version[0] in ['<', '<=']:
                         up = version[1]['version'].split('.')
