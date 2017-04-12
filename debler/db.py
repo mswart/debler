@@ -183,16 +183,17 @@ class Database():
 
     def gem_rebuild(self, name, message):
         c = self.conn.cursor()
-        c.execute("""SELECT substring(name from 9), slot, version, revision, dist
+        c.execute("""SELECT gem_name, slot, version, revision, dist
             FROM (
-                SELECT DISTINCT substring(name from 9), slot,
+                SELECT DISTINCT substring(name from 9) AS gem_name,
+                    slot,
                     first_value(version) OVER w AS version,
                     first_value(revision) OVER w AS revision,
                     first_value(distribution) OVER w AS dist
                 FROM package_versions
                 WINDOW w AS (PARTITION BY substring(name from 9), slot ORDER BY version DESC, revision DESC)
             ) AS w
-            WHERE name = %s""", ('rubygem:' + name, ))
+            WHERE gem_name = %s""", (name, ))
         for data in c:
             self._gem_rebuild(message, *data)
 
