@@ -31,6 +31,13 @@ class GemVersion():
     def fromstr(cls, s):
         parts = []
         for part in s.split('.'):
+            if part.isdecimal():
+                parts.append(int(part))
+            else:
+                parts.append(-1)
+                for char in parts:
+                    parts.append(ord(char))
+                parts.append(0)
             if part.startswith('beta'):
                 parts.append(-9)
                 part = part[4:]
@@ -48,13 +55,22 @@ class GemVersion():
     def __str__(self):
         s = ''
         needdot = False
+        instr = False
         for part in self.parts:
             if needdot:
                 s += '.'
             else:
                 needdot = True
-            if part >= 0:
+            if instr and part == 0:
+                instr = False
+            elif instr and part > 0:
+                s += chr(part)
+                needdot = False
+            elif part >= 0:
                 s += str(part)
+            elif part == -1:
+                instr = True
+                needdot = False
             elif part == -9:
                 s += 'beta'
                 needdot = False
