@@ -35,21 +35,9 @@ class GemVersion():
                 parts.append(int(part))
             else:
                 parts.append(-1)
-                for char in parts:
+                for char in part:
                     parts.append(ord(char))
                 parts.append(0)
-            if part.startswith('beta'):
-                parts.append(-9)
-                part = part[4:]
-            elif part.startswith('xikolo'):
-                parts.append(-8)
-                continue
-            elif part.startswith('openhpi'):
-                parts.append(-7)
-                continue
-            elif part.startswith('alpha'):
-                parts.append(-19)
-            parts.append(int(part))
         return cls(parts)
 
     def __str__(self):
