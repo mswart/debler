@@ -35,7 +35,7 @@ class Parser():
         self.dependencies = {}
         self.dependencies.update(self.runtimeDependencies)
         if withDevDependencies:
-            self.dependencies.update(self.depDependencies)
+            self.dependencies.update(self.devDependencies)
 
     @classmethod
     def parse(cls, base, packages, withDevDependencies=True):
