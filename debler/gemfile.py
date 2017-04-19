@@ -1,4 +1,5 @@
 import lepl
+import os
 
 from debler.gem import GemVersion
 
@@ -70,8 +71,37 @@ def ret(v):
         return v
     return call
 
+
+def fetch_env(env):
+    return os.environ.get(env)
+
+
+def eval_conditional(cont, expr, alternative):
+    if cont:
+        return expr
+    else:
+        return alternative
+
+
+class Assignment():
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+
+
+class VariableAccess():
+    def __init__(self, name):
+        self.name = name
+
+
+from string import ascii_letters, digits
+
+maybespace = lepl.Drop(lepl.Optional(lepl.Space()))
+
 string = (lepl.Drop('\'') & lepl.Star(lepl.AnyBut('\'')) & lepl.Drop('\'')) > build_str
 symbol = lepl.Drop(':') & lepl.Star(lepl.AnyBut('\':\t\n ')) > build_str
+identifier = lepl.Any(ascii_letters + '_') & lepl.Star(lepl.Any(ascii_letters + '_' + digits)) & lepl.Optional(lepl.Any('?!')) > build_str
+variable_read = identifier > expand(VariableAccess)
 
 line_comment = lepl.Literal('#') & lepl.Star(lepl.AnyBut('\n'))
 newline = lepl.Drop(lepl.Star(lepl.Space()) & lepl.Optional(line_comment) & lepl.Literal('\n') & lepl.Star(lepl.Space()))
@@ -79,18 +109,34 @@ newline = lepl.Drop(lepl.Star(lepl.Space()) & lepl.Optional(line_comment) & lepl
 # define ruby line
 ruby = lepl.Drop('ruby') & ~lepl.Space() & string >> ret(None)
 
+expr = lepl.Delayed()
+
+true = lepl.Literal('true') >> ret(True)
+false = lepl.Literal('false') >> ret(False)
+constant_value = true | false | symbol | string | variable_read
+
+env_expr = lepl.Drop('ENV[') & maybespace & string & maybespace & lepl.Drop(']') > expand(fetch_env)
+
+parentheses_expr = lepl.Drop('(') & maybespace & expr  & maybespace & lepl.Drop(')')
+simple_expr = parentheses_expr | env_expr | constant_value
+
+conditional_expr = simple_expr & maybespace & lepl.Drop('?') & maybespace & simple_expr & maybespace & lepl.Drop(':') & maybespace & expr > expand(eval_conditional)
+expr += conditional_expr | simple_expr
+
+keywoard_value = simple_expr
+keyword_name = lepl.Star(lepl.AnyBut(':\t ')) > build_str
+keyword_newstyle = keyword_name & lepl.Drop(':') & ~lepl.Space() & keywoard_value > tuple
+keyword_oldstyle = lepl.Drop(':') & keyword_name & ~lepl.Space() & lepl.Drop('=>') & ~lepl.Space() & keywoard_value > tuple
+keyword = keyword_newstyle | keyword_oldstyle
+keywords = lepl.Star(~lepl.Drop(',') & ~lepl.Space() & keyword) > dict
+
 # define gem line
 gem = lepl.Drop('gem') & ~lepl.Space() & string
 # optional version constraints
-gem_constraints = lepl.Star(~lepl.Star(lepl.Space()) & ~lepl.Drop(',') & ~lepl.Star(lepl.Space()) & string) > tuple
+gem_constraint_value = variable_read | string
+gem_constraints = lepl.Star(~lepl.Star(lepl.Space()) & ~lepl.Drop(',') & ~lepl.Star(lepl.Space()) & ~lepl.Lookahead(keyword) & gem_constraint_value) > tuple
 gem &= gem_constraints
 # optional keywords
-true = lepl.Literal('true') >> ret(True)
-false = lepl.Literal('false') >> ret(False)
-value = true | false | symbol | string
-keyword_name = lepl.Star(lepl.AnyBut(':\t ')) > build_str
-keyword = keyword_name & lepl.Drop(':') & ~lepl.Space() & value > tuple
-keywords = lepl.Star(~lepl.Drop(',') & ~lepl.Space() & keyword) > dict
 gem &= keywords
 # comment
 gem &= lepl.Drop(lepl.Star(lepl.Space()) & lepl.Optional(line_comment))
@@ -105,7 +151,10 @@ group = group_start & group_content & group_end > expand(build_gems)
 
 source = ~lepl.Literal('source') & ~lepl.Space() & string > expand(Source)
 
-parser = lepl.Star(source | ruby | gem | group | newline)
+var_assignment = identifier & maybespace & lepl.Drop('=') & maybespace & expr > expand(Assignment)
+
+
+parser = lepl.Star(source | var_assignment | ruby | gem | group | newline)
 
 
 class Parser():
@@ -132,16 +181,22 @@ class Parser():
 
     def parse_gemfile(self, file):
         d = parser.parse(open(file, 'r'))
+        assignments = {}
         for o in d:
-            if type(o) is GemfileGem:
-                self.gems[o.name] = Gem(o.name, None, o.constraints,
+            if type(o) is Assignment:
+                assignments[o.name] = o.value
+            elif type(o) is GemfileGem:
+                self.gems[o.name] = Gem(o.name, None, self.resolve(assignments, o.constraints),
                                         o.opts['envs'], o.opts.get('require', True),
                                         o.opts.get('path', None))
             elif type(o) is tuple:
                 for os in o:
-                    self.gems[os.name] = Gem(os.name, None, os.constraints,
+                    self.gems[os.name] = Gem(os.name, None, self.resolve(assignments, os.constraints),
                                              os.opts['envs'], os.opts.get('require', True),
                                              os.opts.get('path', None))
+
+    def resolve(self, assignments, constraints):
+        return (assignments[c.name] if type(c) is VariableAccess else c for c in constraints)
 
     def parse_gemlock(self, file):
         current_state = None
