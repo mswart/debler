@@ -59,7 +59,7 @@ class Database():
                   ('rubygem:' + name, list(slot)))
         versions = []
         for version in c:
-            versions.append(tuple(version[0]))
+            versions.append(list(version[0]))
         return versions
 
     def register_npm(self, name):
