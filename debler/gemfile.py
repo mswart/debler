@@ -233,6 +233,9 @@ class Parser():
                                       tuple(), tuple())
             current_gem = self.gems[name]
 
+    def parse_GIT(self, lines):
+        pass
+
     def parse_PLATFORMS(self, lines):
         platforms = [s.strip() for s in lines]
         for platform in platforms:
