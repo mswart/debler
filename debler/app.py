@@ -68,6 +68,14 @@ class AppInfo():
                     name, slot,
                     version=gem.version.todb(), revision=1,
                     changelog='Import newly into debler', distribution=config.distribution)
+                continue
+            versions = self.db.gem_slot_versions(name, slot)
+            if gem.version.todb() > versions[-1]:
+                self.db.create_gem_version(
+                    name, slot,
+                    version=gem.version.todb(), revision=1,
+                    changelog='Update to version used in application', distribution=config.distribution)
+
 
     @property
     def gems(self):

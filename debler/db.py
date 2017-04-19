@@ -53,6 +53,15 @@ class Database():
             slots[tuple(slot)] = metadata
         return level, opts, native, slots
 
+    def gem_slot_versions(self, name, slot):
+        c = self.conn.cursor()
+        c.execute('SELECT DISTINCT version FROM package_versions WHERE name = %s and slot = %s ORDER BY version ASC',
+                  ('rubygem:' + name, list(slot)))
+        versions = []
+        for version in c:
+            versions.append(tuple(version[0]))
+        return versions
+
     def register_npm(self, name):
         c = self.conn.cursor()
         c.execute("""INSERT INTO gems (name, level, native)
