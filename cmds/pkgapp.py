@@ -10,6 +10,9 @@ def run(args):
     db = Database()
     app = AppInfo.fromyml(db, args.app_info)
 
+    if args.parse_only:
+        return
+
     app.schedule_dep_builds()
     if args.schedule_dep_builds_only:
         return
@@ -32,4 +35,7 @@ def register(subparsers):
     parser.add_argument('--schedule-dep-builds-only', '-D',
                         action='store_true', default=False,
                         help='only schedule needed builds for depended gems')
+    parser.add_argument('--parse-only', '-P',
+                        action='store_true', default=False,
+                        help='only parse and process dependencies')
     parser.set_defaults(run=run)
