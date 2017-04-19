@@ -80,7 +80,7 @@ def run(args):
 
 
 def build(arg):
-    arg, revision = arg.split('-')
+    arg, revision = arg.rsplit('-', 1)  # slots/versions could have negative numbers (-)
     pkger, name, slot, version = arg.split(':')
     slot = [int(s) for s in slot.split('.')]
     version = [int(s) for s in version.split('.')]
