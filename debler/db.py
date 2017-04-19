@@ -130,11 +130,19 @@ class Database():
             else:
                 break
 
-    def scheduled_builds(self):
-        yield from self._iter_builds('scheduled')
+    def _dump_builds(self, state):
+        c = self.conn.cursor()
+        c.execute('''SELECT split_part(name, ':', 1), split_part(name, ':', 2), slot, version, revision
+                     FROM package_versions
+                     WHERE state = %s''', (state, ))
+        for pkg in c:
+            yield pkg
 
-    def failed_builds(self):
-        yield from self._iter_builds('failed')
+    def scheduled_builds(self, all=False):
+        yield from (self._dump_builds if all else self._iter_builds)('scheduled')
+
+    def failed_builds(self, all=False):
+        yield from (self._dump_builds if all else self._iter_builds)('failed')
 
     def update_build(self, pkger, name, slot, version, revision, state):
         c = self.conn.cursor()

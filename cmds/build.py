@@ -28,12 +28,17 @@ def run(args):
     failed = 0
     successful = 0
 
-    if args.retry:
+    if args.builds:
+        builds = lambda all: args.builds
+    elif args.retry:
         builds = db.failed_builds
     else:
         builds = db.scheduled_builds
 
-    for pkger, *data in builds():
+    for pkger, *data in builds(all=args.print_builds):
+        if args.print_builds:
+            print('{}:{}:{}:{}-{}'.format(pkger, data[0], '.'.join(str(i) for i in data[1]), '.'.join(str(i) for i in data[2]), data[3]))
+            continue
         task = '{}:{} in version {}-{}'.format(data[0], GemVersion(data[1]), GemVersion(data[2]), data[3])
         header(task)
         try:
@@ -63,12 +68,23 @@ def run(args):
         if args.limit and total >= args.limit:
             break
 
+    if args.print_builds:
+        return
+
     publish('gem')
 
     print('Built {} packages: {} successful, {} failed'.format(total, successful, failed))
 
     if failed:
         sys.exit(1)
+
+
+def build(arg):
+    arg, revision = arg.split('-')
+    pkger, name, slot, version = arg.split(':')
+    slot = [int(s) for s in slot.split('.')]
+    version = [int(s) for s in version.split('.')]
+    return (pkger, name, slot, version, int(revision))
 
 
 def register(subparsers):
@@ -78,4 +94,8 @@ def register(subparsers):
     parser.add_argument('--limit', '-L', type=int, default=None,
                         help='Build at most n packages',
                         metavar='n')
+    parser.add_argument('--print-builds', '-P', action='store_true')
+    parser.add_argument('builds', nargs='*', metavar='builds',
+                        type=build,
+                        help='Specify build list explicit')
     parser.set_defaults(run=run)
