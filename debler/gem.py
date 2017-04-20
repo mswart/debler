@@ -245,6 +245,22 @@ class GemBuilder(BaseBuilder):
                                 continue
                             possible_deps.append('{}-{}'.format(req, '.'.join(str(s) for s in slot)))
                         deps.append(' | '.join(possible_deps))
+                elif version[0] == '!=':
+                    # we need to exclude all debian revision of this version
+                    # meaning << version or >> version +1
+                    # 1. searching matching slot:
+                    required_version = tuple(int(v) for v in version[1]['version'].split('.'))
+                    for slot in reversed(sorted(slots)):
+                        if required_prefix != slot[:fixed_components]:
+                            continue
+                        parts = version[1]['version'].split('.')
+                        parts[-1] = str(int(parts[-1]) + 1)
+                        deps.append('{pkg} (<< {max_ver} | {pkg} (>> {min_ver})'.format(
+                            pkg='{}-{}'.format(req, '.'.join(str(s) for s in slot)),
+                            max_ver=version[1]['version'],
+                            min_ver='.'.join(parts)
+                        ))
+                        break
                 else:
                     if version[0] in ['<', '<=']:
                         up = version[1]['version'].split('.')
