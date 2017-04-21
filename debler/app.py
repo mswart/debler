@@ -167,7 +167,7 @@ class AppBuilder(BaseBuilder):
             for path in metadata.get('require_paths', []):
                 self.load_paths['all'].append('/usr/share/rubygems-debler/{name}/{}/'.format(path, name=gem_slot_name))
             for binary in metadata['binaries']:
-                self.binaries.append((os.path.basename(binary),
+                self.binaries.append((binary.split('/', 1)[1],
                                       os.path.join('/usr/share/rubygems-debler', gem_slot_name, binary),
                                       metadata.get('require', [])))
             if native:
