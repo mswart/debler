@@ -196,7 +196,7 @@ class Parser():
                                              os.opts.get('path', None))
 
     def resolve(self, assignments, constraints):
-        return (assignments[c.name] if type(c) is VariableAccess else c for c in constraints)
+        return tuple(assignments[c.name] if type(c) is VariableAccess else c for c in constraints)
 
     def parse_gemlock(self, file):
         current_state = None
