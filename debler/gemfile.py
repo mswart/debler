@@ -158,12 +158,17 @@ parser = lepl.Star(source | var_assignment | ruby | gem | group | newline)
 
 
 class Parser():
-    def __init__(self, gemfile):
+    def __init__(self, gemfile, ignore_gems=[]):
         self.gems = {}
         self.parse_gemfile(gemfile)
         self.parse_gemlock(gemfile + '.lock')
-        # ignore bundler listing
+
+        # ignore bundler listing:
         self.gems.pop('bundler', None)
+        # ignore custom gems:
+        for gem in ignore_gems:
+            self.gems.pop(gem, None)
+
         self.sorted_gems = list(self.sort_gems())
 
     def sort_gems(self):

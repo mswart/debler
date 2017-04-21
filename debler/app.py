@@ -19,7 +19,7 @@ class AppInfo():
     def __init__(self, db, name, version, basedir, *, gemfile=None,
                  homepage=None, description=None, executables=[], dirs=[],
                  bundler_laucher=False, files=[], default_env=None,
-                 npm=None):
+                 npm=None, ignore_gems=[]):
         self.db = db
         self.name = name
         if type(version) is list:
@@ -28,7 +28,7 @@ class AppInfo():
             self.version = tuple(int(i) for i in str(version).split('.'))
         self.basedir = basedir
         if gemfile is not None:
-            self.gemfile = GemfileParser(os.path.join(self.basedir, gemfile))
+            self.gemfile = GemfileParser(os.path.join(self.basedir, gemfile), ignore_gems)
         else:
             self.gemfile = None
         if npm is not None:
