@@ -424,6 +424,7 @@ Gem::Specification.new do |s|
             f.write('end\n')
 
         current_level = None
+        require_files = []
         with open(self.debian_file(self.deb_name + '.install'), 'w') as f:
             f.write('debian/{gem}.gemspec /usr/share/rubygems-debler/{name}/\n'.format(
                 gem=self.gem_name, name=self.own_name))
@@ -438,10 +439,10 @@ Gem::Specification.new do |s|
                         if member.name.startswith(path) and member.name.endswith('.rb'):
                             parts = member.name.split('/')
                             if current_level is None or len(parts) < current_level:
-                                metadata['require'] = [member.name[len(path)+1:-3]]  # not extension
+                                require_files = [member.name[len(path)+1:-3]]  # not extension
                                 current_level = len(parts)
                             elif len(parts) == current_level:  # should not happend
-                                metadata['require'].append(member.name[len(path)+1:-3])  # no extension + require path
+                                require_files.append(member.name[len(path)+1:-3])  # no extension + require path
                     for path in self.metadata['require_paths'] + [self.metadata['bindir'], 'data', 'vendor'] + opts.get('default', {}).get('extra_dirs', []):
                         if member.name.startswith(path):
                             break
@@ -451,6 +452,17 @@ Gem::Specification.new do |s|
                         name=self.own_name,
                         file=member.name,
                         dir=os.path.dirname(member.name)))
+        if self.orig_name in require_files:
+            metadata['require'] = self.orig_name
+        elif self.orig_name.replace('-', '/') in require_files:
+            metadata['require'] = self.orig_name.replace('-', '/')
+        elif len(require_files) == 1:
+            metadata['require'] = require_files
+        elif not require_files:
+            pass
+        else:
+            # not sure what to do ...
+            metadata['require'] = require_files
         self.db.set_gem_slot_metadata(self.gem_name, self.gem_slot.todb(), metadata)
 
     def extension_list(self):
