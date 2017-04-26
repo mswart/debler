@@ -453,9 +453,9 @@ Gem::Specification.new do |s|
                         file=member.name,
                         dir=os.path.dirname(member.name)))
         if self.orig_name in require_files:
-            metadata['require'] = self.orig_name
+            metadata['require'] = [self.orig_name]
         elif self.orig_name.replace('-', '/') in require_files:
-            metadata['require'] = self.orig_name.replace('-', '/')
+            metadata['require'] = [self.orig_name.replace('-', '/')]
         elif len(require_files) == 1:
             metadata['require'] = require_files
         elif not require_files:
