@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.realpath(os.path.join(__file__, '..', '..')))
 parser = argparse.ArgumentParser(prog='debler')
 subparserse = parser.add_subparsers()
 
-for cmd_name in ['pkgapp', 'build', 'publish', 'rebuild', 'gem']:
+for cmd_name in ['pkgapp', 'build', 'publish', 'rebuild', 'gem', 'serve']:
     cmd = import_module('cmds.{}'.format(cmd_name))
     getattr(cmd, 'register')(subparserse)
 

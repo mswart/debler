@@ -26,11 +26,13 @@ class Database():
              VALUES (%s, %s);""", ('rubygem:' + name, list(slot)))
         self.conn.commit()
 
-    def gem_info(self, name):
+    def gem_info(self, name, autocreate=True):
         c = self.conn.cursor()
         c.execute('SELECT level, opts, native FROM gems WHERE name = %s', ('rubygem:' + name, ))
         result = c.fetchone()
         if result is None:
+            if not autocreate:
+                return None
             print('Configure {}:'.format(name))
             from urllib.request import urlopen
             url = '{}/api/v1/versions/{}.json'.format(self.rubygems, name)

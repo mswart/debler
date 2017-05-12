@@ -16,5 +16,6 @@ distribution = data['distribution']
 gem_package_upload = data['package_uploads']['gem']
 app_package_upload = data['package_uploads']['app']
 npm_package_upload = data['package_uploads']['npm']
+rubygems_apikey = data.get('rubygems_apikey', None)
 
 del data
