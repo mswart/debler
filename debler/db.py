@@ -64,6 +64,15 @@ class Database():
             versions.append(list(version[0]))
         return versions
 
+    def gem_extra(self, name, slot, version, revision):
+        c = self.conn.cursor()
+        c.execute('SELECT extra FROM package_versions'
+                  + ' WHERE name = %s AND slot = %s AND version = %s AND revision = %s',
+                  ('rubygem:' + name, slot, version, revision))
+        result = c.fetchone()
+        if result:
+            return result[0]
+
     def register_npm(self, name):
         c = self.conn.cursor()
         c.execute("""INSERT INTO gems (name, level, native)
@@ -154,14 +163,15 @@ class Database():
         self.conn.commit()
 
     def create_gem_version(self, name, slot, *, version, revision,
-                           format=None, changelog, distribution):
+                           format=None, changelog, distribution,
+                           extra={}):
         now = datetime.now(tz=tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z')
         c = self.conn.cursor()
         c.execute("""INSERT INTO package_versions (name, slot, version, revision,
-                format, scheduled_at, changelog, distribution)
-             VALUES (%s, %s, %s, %s, %s, %s, %s, %s);""",
+                format, scheduled_at, changelog, distribution, extra)
+             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);""",
                   ('rubygem:' + name, list(slot), version, revision, format or config.gem_format,
-                   now, changelog, distribution))
+                   now, changelog, distribution, json.dumps(extra)))
         self.conn.commit()
 
     def schedule_npm_version(self, name, slot, *, version, revision,

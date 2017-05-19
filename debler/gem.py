@@ -3,6 +3,8 @@ import tarfile
 import gzip
 import yaml
 import subprocess
+from shutil import move
+from glob import glob
 
 from debian.deb822 import Deb822, Dsc
 from debian.changelog import Changelog
@@ -33,6 +35,14 @@ class GemVersion():
         for part in s.split('.'):
             if part.isdecimal():
                 parts.append(int(part))
+            elif part.startswith('rev'):
+                parts.append(-2)
+                part = part[3:]
+                assert len(part) == 40
+                while len(part) > 0:
+                    parts.append(int(part[:8], 16))
+                    part = part[8:]
+                parts.append(0)
             else:
                 parts.append(-1)
                 for char in part:
@@ -44,21 +54,29 @@ class GemVersion():
         s = ''
         needdot = False
         instr = False
+        inrev = False
         for part in self.parts:
             if needdot:
                 s += '.'
             else:
                 needdot = True
-            if instr and part == 0:
+            if part == 0 and (instr or inrev):
                 instr = False
-            elif instr and part > 0:
+            elif instr:
                 s += chr(part)
+                needdot = False
+            elif inrev:
+                s += hex(part)[2:]
                 needdot = False
             elif part >= 0:
                 s += str(part)
             elif part == -1:
                 instr = True
                 needdot = False
+            elif part == -2:
+                inrev = True
+                needdot = False
+                s += 'rev'
             elif part == -9:
                 s += 'beta'
                 needdot = False
@@ -90,6 +108,8 @@ class GemBuilder(BaseBuilder):
         self.revision = revision
         self.deb_version = str(self.gem_version) + '-' + str(revision)
 
+        self.extra = self.db.gem_extra(gem, slot, version, revision)
+
         self.own_name = self.gem_name
         if self.gem_slot:
             self.own_name += '-' + str(self.gem_slot)
@@ -115,11 +135,19 @@ class GemBuilder(BaseBuilder):
 
     @property
     def src_file(self):
-        return os.path.join(config.gemdir, 'versions', self.gem_name, str(self.gem_version) + '.gem')
+        return os.path.join(
+            config.gemdir,
+            'versions',
+            self.gem_name,
+            str(self.gem_version) + '.gem')
 
     @property
     def tarxz_file(self):
-        return os.path.join(config.gemdir, 'versions', self.gem_name, str(self.gem_version) + '.tar.xz')
+        return os.path.join(
+            config.gemdir,
+            'versions',
+            self.gem_name,
+            str(self.gem_version)  + '.tar.xz')
 
     @property
     def orig_tar(self):
@@ -127,11 +155,25 @@ class GemBuilder(BaseBuilder):
                                                                       str(self.gem_version)))
 
     def fetch_source(self):
-        if not os.path.isfile(self.src_file):
+        if os.path.isfile(self.src_file):
+            return
+        if 'revision' not in self.extra:
             subprocess.check_call(['wget',
                                    '{}/gems/{}-{}.gem'
                                   .format(config.rubygems, self.gem_name, self.gem_version),
                                    '-O', self.src_file])
+        subprocess.check_call(['git', 'clone',
+                               self.extra['repository'],
+                               os.path.join(self.tmp_dir, 'git')])
+        subprocess.check_call(['git',
+                               '-C', os.path.join(self.tmp_dir, 'git'),
+                               'reset', '--hard',
+                               self.extra['revision']])
+        subprocess.check_call(['gem', 'build',
+                               *glob(os.path.join(self.tmp_dir, 'git', '*.gemspec'))],
+                               cwd=os.path.join(self.tmp_dir, 'git'))
+        gem_file = glob(os.path.join(self.tmp_dir, 'git', '*.gem'))[0]
+        move(gem_file, self.src_file)
 
     @property
     def slot_dir(self):
@@ -194,12 +236,15 @@ class GemBuilder(BaseBuilder):
 
         control = Deb822()
         control['Package'] = self.deb_name
+        provides = []
         if level > 0:
-            priovide = []
-            priovide.append(self.gemnam2deb(self.gem_name))
+            provides.append(self.gemnam2deb(self.gem_name))
             for l in range(1, level):
-                priovide.append(self.gemnam2deb(self.gem_name + '-' + str(self.gem_version.limit(l))))
-            control['Provides'] = ', '.join(priovide)
+                provides.append(self.gemnam2deb(self.gem_name + '-' + str(self.gem_version.limit(l))))
+        if 'revision' in self.extra:
+            provides.append(self.gemnam2deb(self.gem_name) + '-' + self.extra['revision'])
+        if provides:
+            control['Provides'] = ', '.join(provides)
         control['Architecture'] = 'all'
         deps = []
         for dep in self.metadata['dependencies']:

@@ -10,6 +10,7 @@ from debian.deb822 import Deb822, Dsc
 
 
 from debler.gemfile import Parser as GemfileParser
+from debler.gem import GemVersion
 from debler.npm import Parser as NpmParser
 from debler.builder import BaseBuilder
 from debler import config
@@ -62,20 +63,42 @@ class AppInfo():
                 continue
             level, builddeps, native, slots = self.db.gem_info(name)
             slot = tuple(gem.version.limit(level).todb())
+            if gem.revision:
+                extra = {
+                    'repository': gem.remote,
+                    'revision': gem.revision
+                }
+                gem.version = GemVersion.fromstr(str(gem.version) + '.rev' + gem.revision)
+            else:
+                extra = {}
+            dbversion = gem.version.todb()
             if slot not in slots:
                 self.db.create_gem_slot(name, slot)
                 self.db.create_gem_version(
                     name, slot,
-                    version=gem.version.todb(), revision=1,
-                    changelog='Import newly into debler', distribution=config.distribution)
+                    version=dbversion, revision=1,
+                    changelog='Import newly into debler',
+                    distribution=config.distribution,
+                    extra=extra)
                 continue
             versions = self.db.gem_slot_versions(name, slot)
-            if gem.version.todb() > versions[-1]:
+            if gem.revision:
+                if dbversion in versions:  # already build
+                    continue
                 self.db.create_gem_version(
                     name, slot,
-                    version=gem.version.todb(), revision=1,
-                    changelog='Update to version used in application', distribution=config.distribution)
-
+                    version=dbversion, revision=1,
+                    changelog='Build from upstream repository',
+                    distribution=config.distribution,
+                    extra=extra)
+                continue
+            if dbversion > versions[-1]:
+                self.db.create_gem_version(
+                    name, slot,
+                    version=dbversion, revision=1,
+                    changelog='Update to version used in application',
+                    distribution=config.distribution,
+                    extra=extra)
 
     @property
     def gems(self):
@@ -172,7 +195,9 @@ class AppBuilder(BaseBuilder):
                                       metadata.get('require', [])))
             if native:
                 natives.append((deb_dep, gem_slot_name))
-            if gem.constraints:
+            if gem.revision:
+                deps.append(self.gemnam2deb(name) + '-' + gem.revision)
+            elif gem.constraints:
                 for constraint in gem.constraints:
                     if ' ' not in constraint:
                         constraint = '= ' + constraint
