@@ -3,6 +3,7 @@ import tarfile
 import gzip
 import yaml
 import subprocess
+import re
 from shutil import move
 from glob import glob
 
@@ -162,6 +163,7 @@ class GemBuilder(BaseBuilder):
                                    '{}/gems/{}-{}.gem'
                                   .format(config.rubygems, self.gem_name, self.gem_version),
                                    '-O', self.src_file])
+            return
         subprocess.check_call(['git', 'clone',
                                self.extra['repository'],
                                os.path.join(self.tmp_dir, 'git')])
@@ -311,9 +313,10 @@ class GemBuilder(BaseBuilder):
                         up[-1] = str(int(up[-1]) + 1)
                         v = '.'.join(up)
                     else:
-                        v = version[1]['version']
+                        v = re.sub('\.([^0-9])', '.~\\1', version[1]['version'])
                     versioned_deps = True
                     tmp = []
+                    # todo simplify
                     for slot in slots:
                         if slot:
                             slot = '-' + '.'.join([str(s) for s in slot])
