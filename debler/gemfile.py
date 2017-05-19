@@ -36,11 +36,15 @@ class Gem():
         self.deps = {}
         self.require = require
         self.path = path
+        self.revision = None
+        self.remote = None
 
     def __repr__(self):
         v = str(self.version)
         if self.constraints:
             v += ' (' + ', '.join(self.constraints) + ')'
+        if self.revision:
+            v += ' (rev={})'.format(self.revision)
         return 'Gem({}, v={}, require={}, envs={}, deps={})'.format(
             self.name, v, self.require, ','.join(self.envs) or '-', self.deps)
 
@@ -224,8 +228,23 @@ class Parser():
         assert lines[0][0:10] == '  remote: '
         self.remote = lines[0][10:]
         assert lines[1][0:8] == '  specs:'
+        self.parse_specs(lines[2:])
+
+    def parse_GIT(self, lines):
+        for pos, line in enumerate(lines):
+            if line.startswith('  revision: '):
+                revision = line[12:]
+            if line.startswith('  remote: '):
+                repository = line[10:]
+            if line.startswith('  specs:'):
+                break
+        current_gem = self.parse_specs(lines[pos+1:])
+        current_gem.remote = repository
+        current_gem.revision = revision
+
+    def parse_specs(self, lines):
         current_gem = None
-        for line in lines[2:]:
+        for line in lines:
             if line[4] == ' ':  # skip dependencies
                 a, b = (line.strip() + ' ').split(' ', 1)
                 current_gem.deps[a] = b[1:-2] if b else True
@@ -240,9 +259,7 @@ class Parser():
                 self.gems[name] = Gem(name, GemVersion.fromstr(version),
                                       tuple(), tuple())
             current_gem = self.gems[name]
-
-    def parse_GIT(self, lines):
-        pass
+        return current_gem
 
     def parse_PLATFORMS(self, lines):
         platforms = [s.strip() for s in lines]
