@@ -107,6 +107,9 @@ line_comment = lepl.Literal('#') & lepl.Star(lepl.AnyBut('\n'))
 newline = lepl.Drop(lepl.Star(lepl.Space()) & lepl.Optional(line_comment) & lepl.Literal('\n') & lepl.Star(lepl.Space()))
 
 # define ruby line
+spaces = lepl.Star(lepl.Space())
+breakablespaces = spaces | (lepl.Literal('\n') & lepl.Space() & spaces )
+
 ruby = lepl.Drop('ruby') & ~lepl.Space() & string >> ret(None)
 
 expr = lepl.Delayed()
@@ -125,10 +128,10 @@ expr += conditional_expr | simple_expr
 
 keywoard_value = simple_expr
 keyword_name = lepl.Star(lepl.AnyBut(':\t ')) > build_str
-keyword_newstyle = keyword_name & lepl.Drop(':') & ~lepl.Space() & keywoard_value > tuple
-keyword_oldstyle = lepl.Drop(':') & keyword_name & ~lepl.Space() & lepl.Drop('=>') & ~lepl.Space() & keywoard_value > tuple
+keyword_newstyle = keyword_name & lepl.Drop(':') & ~spaces & keywoard_value > tuple
+keyword_oldstyle = lepl.Drop(':') & keyword_name & ~spaces & lepl.Drop('=>') & ~lepl.Space() & keywoard_value > tuple
 keyword = keyword_newstyle | keyword_oldstyle
-keywords = lepl.Star(~lepl.Drop(',') & ~lepl.Space() & keyword) > dict
+keywords = lepl.Star(~lepl.Drop(',') & ~breakablespaces & keyword) > dict
 
 # define gem line
 gem = lepl.Drop('gem') & ~lepl.Space() & string
