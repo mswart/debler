@@ -112,7 +112,7 @@ newline = lepl.Drop(lepl.Star(lepl.Space()) & lepl.Optional(line_comment) & lepl
 
 # define ruby line
 spaces = lepl.Star(lepl.Space())
-breakablespaces = spaces | (lepl.Literal('\n') & lepl.Space() & spaces )
+breakablespaces = spaces | (lepl.Literal('\n ') & spaces )
 
 ruby = lepl.Drop('ruby') & ~lepl.Space() & string >> ret(None)
 
@@ -133,8 +133,8 @@ expr += conditional_expr | simple_expr
 keywoard_value = simple_expr
 keyword_name = lepl.Star(lepl.AnyBut(':\t ')) > build_str
 keyword_newstyle = keyword_name & lepl.Drop(':') & ~spaces & keywoard_value > tuple
-keyword_oldstyle = lepl.Drop(':') & keyword_name & ~spaces & lepl.Drop('=>') & ~lepl.Space() & keywoard_value > tuple
-keyword = keyword_newstyle | keyword_oldstyle
+keyword_oldstyle = lepl.Drop(':') & keyword_name & ~spaces & lepl.Drop('=>') & ~spaces & keywoard_value > tuple
+keyword = keyword_oldstyle | keyword_newstyle
 keywords = lepl.Star(~lepl.Drop(',') & ~breakablespaces & keyword) > dict
 
 # define gem line
