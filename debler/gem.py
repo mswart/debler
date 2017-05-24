@@ -2,6 +2,7 @@ import os
 import tarfile
 import gzip
 import yaml
+from struct import pack, unpack
 import subprocess
 import re
 from shutil import move
@@ -41,7 +42,8 @@ class GemVersion():
                 part = part[3:]
                 assert len(part) == 40
                 while len(part) > 0:
-                    parts.append(int(part[:8], 16))
+                    i = int(part[:8], 16)
+                    parts.append(unpack('i', pack('I', i))[0])
                     part = part[8:]
                 parts.append(0)
             else:
@@ -67,7 +69,7 @@ class GemVersion():
                 s += chr(part)
                 needdot = False
             elif inrev:
-                s += hex(part)[2:]
+                s += '{:08x}'.format(unpack('I', pack('i', part))[0])
                 needdot = False
             elif part >= 0:
                 s += str(part)
