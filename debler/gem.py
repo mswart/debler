@@ -234,9 +234,6 @@ class GemBuilder(BaseBuilder):
         if self.metadata['homepage']:
             dsc['Homepage'] = self.metadata['homepage']
         dsc['Standards-Version'] = '3.9.6'
-        dsc['Build-Depends'] = ', '.join(build_deps)
-
-        dsc.dump(control_file)
 
         control = Deb822()
         control['Package'] = self.deb_name
@@ -251,17 +248,30 @@ class GemBuilder(BaseBuilder):
             control['Provides'] = ', '.join(provides)
         control['Architecture'] = 'all'
         deps = []
+        self.ext_load_paths = []
         for dep in self.metadata['dependencies']:
             if dep['type'] != ':runtime':
                 continue
-            if dep['name'] == 'bundler':
+            depinfo = self.db.gem_info(dep['name'])
+            if depinfo.get('ignore', False) or dep['name'] == 'bundler':
+                continue
+            req = self.gemnam2deb(dep['name'])
+            if depinfo.get('buildgem', False):
+                # gem is only used during gem building,
+                # no need for runtime dependency
+                slot = list(depinfo.slots.keys())[-1]
+                slot_s = '.'.join(str(s) for s in slot)
+                build_deps.append(req + '-' + slot_s)
+                for path in depinfo.slots[slot].get('require_paths', []):
+                    self.ext_load_paths.append(
+                        '/usr/share/rubygems-debler/{name}-{slot}/{}/'.format(
+                            path, name=dep['name'], slot=slot_s))
+                # TODO: implement version contraint
                 continue
             versioned_deps = False
             for version in dep['version_requirements']['requirements']:
-                req = self.gemnam2deb(dep['name'])
                 if version[0] == '>=' and version[1]['version'] == '0':
                     continue
-                depinfo = self.db.gem_info(dep['name'])
                 if not depinfo.slots:
                     continue
                 if version[0] != '=' and '.rc' in version[1]['version']:
@@ -341,6 +351,8 @@ class GemBuilder(BaseBuilder):
         control['Description'] = self.metadata['summary']
         control['Description'] += ('\n' + (self.metadata['description'] or '')).replace('\n\n', '\n.\n').replace('\n', '\n ')
 
+        dsc['Build-Depends'] = ', '.join(build_deps)
+        dsc.dump(control_file)
         control_file.write(b'\n')
         control.dump(control_file)
 
@@ -382,10 +394,14 @@ class GemBuilder(BaseBuilder):
         info = self.db.gem_info(self.gem_name)
         ext_args = info.lookup('ext_args', '')
         subdir = info.get('so_subdir', '')
+        rubyopts = ''
+        for load_path in self.ext_load_paths:
+            rubyopts += ' -I{path}'.format(path=load_path)
         if len(exts) == 1:
             rules['build'].append(' v'.join(['mkdir'] + list(config.rubies)))
             for ruby in config.rubies:
-                rules['build'].append('cd v{v} && ruby{v} ../src/{} {}'.format(exts[0], ext_args, v=ruby))
+                rules['build'].append('cd v{v} && ruby{v} {rubyopts} ../src/{} {}'.format(
+                    exts[0], ext_args, v=ruby, rubyopts=rubyopts))
             for ruby in config.rubies:
                 rules['build'].append('make -C v{v}'.format(v=ruby))
             for ruby in config.rubies:
@@ -405,8 +421,8 @@ class GemBuilder(BaseBuilder):
             rules['build'].append(' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in self.metadata['extensions'] for ruby in config.rubies]))
             for ext in exts:
                 for ruby in config.rubies:
-                    rules['build'].append('cd v{v}/{ext} && ruby{v} ../../src/{} {}'.format(
-                        ext, ext_args, ext=ext.replace('/', '_'), v=ruby))
+                    rules['build'].append('cd v{v}/{ext} && ruby{v} {rubyopts}../../src/{} {}'.format(
+                        ext, ext_args, ext=ext.replace('/', '_'), v=ruby, rubyopts=rubyopts))
             for ext in exts:
                 for ruby in config.rubies:
                     rules['build'].append('make -C v{v}/{ext}'.format(
