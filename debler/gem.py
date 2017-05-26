@@ -482,7 +482,7 @@ Gem::Specification.new do |s|
                 members = dt.getmembers()
                 for member in members:
                     # search for binaries
-                    if self.metadata['bindir'] and member.name.startswith(self.metadata['bindir']):
+                    if self.metadata['bindir'] and member.name.startswith(self.metadata['bindir'] + '/'):
                         metadata['binaries'].append(member.name)
                     # search for require entry files (top level file ...)
                     for path in self.metadata['require_paths']:
