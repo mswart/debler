@@ -8,6 +8,23 @@ from debler.gem import GemVersion
 from debler import config
 
 
+class PkgInfo():
+    def __init__(self, level, opts, native, slots):
+        self.level = level
+        self.opts = opts
+        self.native = native
+        self.slots = slots
+
+    def lookup(self, name, default):
+        return self.opts.get('default', {}).get(name, default)
+
+    def get(self, name, default=None):
+        return self.lookup(name, default=default)
+
+    def __getattr__(self, name):
+        return self.lookup(name, default=None)
+
+
 class Database():
     rubygems = 'https://rubygems.org'
 
@@ -53,7 +70,7 @@ class Database():
             if type(metadata) is str:
                 metadata = json.loads(metadata)
             slots[tuple(slot)] = metadata
-        return level, opts, native, slots
+        return PkgInfo(level, opts, native, slots)
 
     def gem_slot_versions(self, name, slot):
         c = self.conn.cursor()

@@ -5,7 +5,6 @@ import json
 
 
 import debler.db
-from debler.gem import GemVersion
 from debler import config
 
 
@@ -38,7 +37,8 @@ class DeblerHandler(http.server.BaseHTTPRequestHandler):
         if 'Authorization' not in self.headers:
             self.send_error(403)
             return
-        if 'Content-Type' not in self.headers or self.headers['Content-Type'] != 'application/json':
+        if 'Content-Type' not in self.headers \
+                or self.headers['Content-Type'] != 'application/json':
             self.send_error(415)
             return
         if 'Content-Length' not in self.headers:
@@ -72,13 +72,13 @@ class DeblerHandler(http.server.BaseHTTPRequestHandler):
         if not info:
             print('  -> not used')
             return
-        level, _, _, slots = info
-        new_slot = tuple(int(v) for v in version.split('.')[:level])
-        if new_slot in slots:
+        new_slot = tuple(int(v) for v in version.split('.')[:info.level])
+        if new_slot in info.slots:
             self.db.create_gem_version(
                 name, list(new_slot),
                 version=list(int(v) for v in version.split('.')), revision=1,
-                changelog='New upstream release', distribution=config.distribution)
+                changelog='New upstream release',
+                distribution=config.distribution)
             print('  -> scheduled build in slot {}'.format(new_slot))
         else:
             print('  -> version in unknown slot {}'.format(new_slot))

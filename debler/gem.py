@@ -219,12 +219,12 @@ class GemBuilder(BaseBuilder):
                 build_deps.append('ruby{}'.format(ruby))
                 build_deps.append('ruby{}-dev'.format(ruby))
 
-        level, opts, native, _ = self.db.gem_info(self.gem_name)
-        if native is None:  # auto-detect on first build
-            native = bool(len(exts) > 0)
-            self.db.set_gem_native(self.gem_name, native)
-        assert native is (len(exts) > 0), 'Native flag value is wrong!'
-        build_deps.extend(opts.get('default', {}).get('builddeps', []))
+        info = self.db.gem_info(self.gem_name)
+        if info.native is None:  # auto-detect on first build
+            info.native = bool(len(exts) > 0)
+            self.db.set_gem_native(self.gem_name, info.native)
+        assert info.native is (len(exts) > 0), 'Native flag value is wrong!'
+        build_deps.extend(info.get('builddeps', []))
         control_file = open(self.debian_file('control'), 'wb')
 
         dsc = Dsc()
@@ -241,9 +241,9 @@ class GemBuilder(BaseBuilder):
         control = Deb822()
         control['Package'] = self.deb_name
         provides = []
-        if level > 0:
+        if info.level > 0:
             provides.append(self.gemnam2deb(self.gem_name))
-            for l in range(1, level):
+            for l in range(1, info.level):
                 provides.append(self.gemnam2deb(self.gem_name + '-' + str(self.gem_version.limit(l))))
         if 'revision' in self.extra:
             provides.append(self.gemnam2deb(self.gem_name) + '-' + self.extra['revision'])
@@ -261,8 +261,8 @@ class GemBuilder(BaseBuilder):
                 req = self.gemnam2deb(dep['name'])
                 if version[0] == '>=' and version[1]['version'] == '0':
                     continue
-                req_level, _, _, slots = self.db.gem_info(dep['name'])
-                if not slots:
+                depinfo = self.db.gem_info(dep['name'])
+                if not depinfo.slots:
                     continue
                 if version[0] != '=' and '.rc' in version[1]['version']:
                     version[1]['version'] = version[1]['version'][:version[1]['version'].find('.rc')]
@@ -271,25 +271,25 @@ class GemBuilder(BaseBuilder):
                     min_version = version[1]['version']
                     up = min_version.split('.')
                     fixed_components = len(up) - 1
-                    if fixed_components > req_level:
+                    if fixed_components > depinfo.req_level:
                         # we stay within one slot
                         # e.g. ~> 1.5 and slots = (0, 1, 2)
-                        req += '-' + '.'.join(up[:req_level])
+                        req += '-' + '.'.join(up[:depinfo.req_level])
                         deps.append('{} (>= {})'.format(req, min_version))
                         up[-1] = '0'
                         up[-2] = str(int(up[-2]) + 1)
                         deps.append('{} (<< {})'.format(req, '.'.join(up)))
-                    elif fixed_components == req_level:
+                    elif fixed_components == depinfo.req_level:
                         # we are pinned to a specific slot
                         # e.g. ~> 1.5.1 and slots 1.5, 1.6
                         deps.append('{}-{}'.format(req, '.'.join(up[:fixed_components])))
-                    elif fixed_components < req_level:
+                    elif fixed_components < depinfo.req_level:
                         # multiple slots fulfil the requirements
                         # e.g. ~> 1.0, and slots 1.5, 1.6, 1.7, 1.8
                         # depend on any of same (but prefer newer ones)
                         possible_deps = []
                         required_prefix = tuple(int(v) for v in up[:fixed_components])
-                        for slot in reversed(sorted(slots)):
+                        for slot in reversed(sorted(depinfo.slots)):
                             if required_prefix != slot[:fixed_components]:
                                 continue
                             possible_deps.append('{}-{}'.format(req, '.'.join(str(s) for s in slot)))
@@ -298,7 +298,7 @@ class GemBuilder(BaseBuilder):
                     # we need to exclude all debian revision of this version
                     # meaning << version or >> version +1
                     # 1. searching matching slot:
-                    for slot in reversed(sorted(slots)):
+                    for slot in reversed(sorted(depinfo.slots)):
                         if slot != tuple(int(v) for v in version[1]['version'].split('.')[:len(slot)]):
                             continue
                         parts = version[1]['version'].split('.')
@@ -319,7 +319,7 @@ class GemBuilder(BaseBuilder):
                     versioned_deps = True
                     tmp = []
                     # todo simplify
-                    for slot in slots:
+                    for slot in depinfo.slots:
                         if slot:
                             slot = '-' + '.'.join([str(s) for s in slot])
                         else:
@@ -328,7 +328,7 @@ class GemBuilder(BaseBuilder):
                     deps.append(' | '.join(tmp))
             if not versioned_deps:
                 deps.append(req)
-        deps.extend(opts.get('default', {}).get('rundeps', []))
+        deps.extend(info.lookup('rundeps', default=[]))
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')
         if len(exts) > 0:
@@ -379,9 +379,9 @@ class GemBuilder(BaseBuilder):
         rules['build'] = []
         rules['install'] = []
         exts = self.extension_list()
-        _, opts, _, _ = self.db.gem_info(self.gem_name)
-        ext_args = opts.get("default", {}).get('ext_args', '')
-        subdir = opts.get('default', {}).get('so_subdir', '')
+        info = self.db.gem_info(self.gem_name)
+        ext_args = info.lookup('ext_args', '')
+        subdir = info.get('so_subdir', '')
         if len(exts) == 1:
             rules['build'].append(' v'.join(['mkdir'] + list(config.rubies)))
             for ruby in config.rubies:
@@ -493,7 +493,7 @@ Gem::Specification.new do |s|
                                 current_level = len(parts)
                             elif len(parts) == current_level:  # should not happend
                                 require_files.append(member.name[len(path)+1:-3])  # no extension + require path
-                    for path in self.metadata['require_paths'] + [self.metadata['bindir'], 'data', 'vendor'] + opts.get('default', {}).get('extra_dirs', []):
+                    for path in self.metadata['require_paths'] + [self.metadata['bindir'], 'data', 'vendor'] + info.get('extra_dirs', []):
                         if member.name.startswith(path):
                             break
                     else:
@@ -516,8 +516,8 @@ Gem::Specification.new do |s|
         self.db.set_gem_slot_metadata(self.gem_name, self.gem_slot.todb(), metadata)
 
     def extension_list(self):
-        _, opts, _, _ = self.db.gem_info(self.gem_name)
+        info = self.db.gem_info(self.gem_name)
         exts = list(self.metadata['extensions'])
-        for ext in opts.get('default', {}).get('skip_exts', []):
+        for ext in info.get('skip_exts', []):
             exts.remove(ext)
         return exts

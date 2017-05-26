@@ -10,28 +10,32 @@ def run(args):
         for gem in args.gem:
             name, version_str = gem.split(':')
             version = GemVersion.fromstr(version_str)
-            level, builddeps, native, slots = db.gem_info(name)
-            slot = tuple(version.limit(level).todb())
-            if slot not in slots:
+            info = db.gem_info(name)
+            slot = tuple(version.limit(info.level).todb())
+            if slot not in info.slots:
                 db.create_gem_slot(name, slot)
             db.create_gem_version(
                 name, slot,
                 version=version.todb(), revision=1,
-                changelog='Import newly into debler', distribution=config.distribution)
+                changelog='Import newly into debler',
+                distribution=config.distribution)
         return
 
     for gem in args.gem:
-        _, opts, _, _ = db.gem_info(gem)
+        opts = db.gem_info(gem).opts
         opts.setdefault('default', {})
         if args.add:
-            message = 'rebuild to include addition dirs into package: {}'.format(', '.join(args.add))
+            message = 'rebuild to include addition directories: {}'.format(
+                ', '.join(args.add))
             opts['default'].setdefault('extra_dirs', [])
             opts['default']['extra_dirs'].extend(args.add)
         elif args.so_subdir:
-            message = 'rebuild to move so libs into "{}" subdir'.format(args.so_subdir)
+            message = 'rebuild to move so libs into "{}" subdir'.format(
+                args.so_subdir)
             opts['default']['so_subdir'] = args.so_subdir
         elif args.run_dep:
-            message = 'rebuild to add new runtime dependencies: {}'.format(', '.join(args.run_dep))
+            message = 'rebuild to add new runtime dependencies: {}'.format(
+                ', '.join(args.run_dep))
             opts['default'].setdefault('rundeps', [])
             opts['default']['rundeps'].extend(args.run_dep)
         elif args.native is True:
@@ -48,9 +52,10 @@ def register(subparsers):
     parser = subparsers.add_parser('gem')
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--add', action='append', default=[],
-                       help='add another dir or file as required + schedule rebuilds of this gem')
+                       help='add another dir or file as required + ' +
+                       'schedule rebuilds of this gem')
     group.add_argument('--so-subdir',
-                       help='set the so subdir + schedule rebuilds of this gem')
+                       help='set the so subdir + schedule rebuild of this gem')
     group.add_argument('--run-dep', action='append', default=[],
                        help='register a new runtime dependency')
     group.add_argument('--native', dest='native', action='store_true')

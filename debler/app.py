@@ -61,8 +61,8 @@ class AppInfo():
         for name, gem in self.gems.items():
             if not gem.version:
                 continue
-            level, builddeps, native, slots = self.db.gem_info(name)
-            slot = tuple(gem.version.limit(level).todb())
+            info = self.db.gem_info(name)
+            slot = tuple(gem.version.limit(info.level).todb())
             if gem.revision:
                 extra = {
                     'repository': gem.remote,
@@ -72,7 +72,7 @@ class AppInfo():
             else:
                 extra = {}
             dbversion = gem.version.todb()
-            if slot not in slots:
+            if slot not in info.slots:
                 self.db.create_gem_slot(name, slot)
                 self.db.create_gem_version(
                     name, slot,
@@ -177,9 +177,9 @@ class AppBuilder(BaseBuilder):
                 self.load_paths['all'].append('/usr/share/{name}/{path}/{}'.format('lib', name=self.app.name, path=gem.path))
                 self.installs['all'].append((gem.path, '/usr/share/{name}/{path}'.format('lib', name=self.app.name, path=os.path.dirname(gem.path))))
                 continue
-            level, builddeps, native, slots = self.db.gem_info(name)
-            slot = tuple(gem.version.limit(level).todb())
-            metadata = slots[slot]
+            info = self.db.gem_info(name)
+            slot = tuple(gem.version.limit(info.level).todb())
+            metadata = info.slots[slot]
             self.gem_metadatas[name] = metadata
             gem_slot_name = name + '-' + '.'.join([str(s) for s in slot])
             self.symlinks['all'].append((
@@ -193,7 +193,7 @@ class AppBuilder(BaseBuilder):
                 self.binaries.append((binary.split('/', 1)[1],
                                       os.path.join('/usr/share/rubygems-debler', gem_slot_name, binary),
                                       metadata.get('require', [])))
-            if native:
+            if info.native:
                 natives.append((deb_dep, gem_slot_name))
             if gem.revision:
                 deps.append(self.gemnam2deb(name) + '-' + gem.revision)
@@ -205,7 +205,7 @@ class AppBuilder(BaseBuilder):
                     if op == '~>':
                         up = vers.split('.')
                         deps.append('{} (>= {})'.format(deb_dep, vers))
-                        if len(up) > level:
+                        if len(up) > info.level:
                             up[-1] = '0'
                             up[-2] = str(int(up[-2]) + 1)
                             deps.append('{} (<= {})'.format(deb_dep, '.'.join(up)))
