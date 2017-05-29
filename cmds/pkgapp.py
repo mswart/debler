@@ -1,3 +1,4 @@
+import functools
 import sys
 from tempfile import TemporaryDirectory
 
@@ -15,6 +16,9 @@ def run(args):
 
     app.schedule_dep_builds()
     if args.schedule_dep_builds_only:
+        scheduled_builds = db.scheduled_builds(all=True)
+        print('{} builds are scheduled'.format(
+            functools.reduce(lambda count, _: count + 1, scheduled_builds, 0)))
         return
 
     with TemporaryDirectory() as d:
