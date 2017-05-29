@@ -281,19 +281,19 @@ class GemBuilder(BaseBuilder):
                     min_version = version[1]['version']
                     up = min_version.split('.')
                     fixed_components = len(up) - 1
-                    if fixed_components > depinfo.req_level:
+                    if fixed_components > depinfo.level:
                         # we stay within one slot
                         # e.g. ~> 1.5 and slots = (0, 1, 2)
-                        req += '-' + '.'.join(up[:depinfo.req_level])
+                        req += '-' + '.'.join(up[:depinfo.level])
                         deps.append('{} (>= {})'.format(req, min_version))
                         up[-1] = '0'
                         up[-2] = str(int(up[-2]) + 1)
                         deps.append('{} (<< {})'.format(req, '.'.join(up)))
-                    elif fixed_components == depinfo.req_level:
+                    elif fixed_components == depinfo.level:
                         # we are pinned to a specific slot
                         # e.g. ~> 1.5.1 and slots 1.5, 1.6
                         deps.append('{}-{}'.format(req, '.'.join(up[:fixed_components])))
-                    elif fixed_components < depinfo.req_level:
+                    elif fixed_components < depinfo.level:
                         # multiple slots fulfil the requirements
                         # e.g. ~> 1.0, and slots 1.5, 1.6, 1.7, 1.8
                         # depend on any of same (but prefer newer ones)
