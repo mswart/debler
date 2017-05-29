@@ -178,6 +178,9 @@ class AppBuilder(BaseBuilder):
                 self.installs['all'].append((gem.path, '/usr/share/{name}/{path}'.format('lib', name=self.app.name, path=os.path.dirname(gem.path))))
                 continue
             info = self.db.gem_info(name)
+            if info.get('buildgem', False):
+                # not needed during runtime
+                continue
             slot = tuple(gem.version.limit(info.level).todb())
             metadata = info.slots[slot]
             self.gem_metadatas[name] = metadata
