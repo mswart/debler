@@ -30,6 +30,7 @@ class Database():
 
     def __init__(self):
         self.conn = psycopg2.connect(config.database)
+        self.conn.autocommit = True
 
     def register_gem(self, name, level, native=None):
         c = self.conn.cursor()
