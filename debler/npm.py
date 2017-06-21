@@ -252,6 +252,7 @@ class NpmBuilder(BaseBuilder):
         rules = {}
         rules['build'] = []
         rules['install'] = []
+        rules['test'] = []  # disable tests for now
 
         with open(self.debian_file('rules'), 'w') as f:
             f.write("#!/usr/bin/make -f\n%:\n\tdh $@\n")
