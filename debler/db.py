@@ -1,18 +1,25 @@
+from datetime import datetime
+from importlib import import_module
 import json
 
-import psycopg2
-from datetime import datetime
+from debian import debian_support
 from dateutil.tz import tzlocal
+import psycopg2
 
 from debler.gem import GemVersion
 from debler import config
 
 
+class Version(debian_support.Version):
+    pass
+
+
 class PkgInfo():
-    def __init__(self, level, opts, native, slots):
-        self.level = level
+    def __init__(self, db, id, name, opts, slots):
+        self.db = db
+        self.id = id
+        self.name = name
         self.opts = opts
-        self.native = native
         self.slots = slots
 
     def lookup(self, name, default):
@@ -24,6 +31,61 @@ class PkgInfo():
     def __getattr__(self, name):
         return self.lookup(name, default=None)
 
+    def slot_for_version(self, version, create=False):
+        parts = str(version).split('.')
+        for slot in self.slots:
+            slot_parts = str(slot.version).split('.')
+            for pos, slot_part in enumerate(slot_parts):
+                if parts[pos] != slot_part:
+                    break
+            else:
+                return slot
+        if not create:
+            raise ValueError('No slot for version "{}" ({!r})'.format(
+                             version, self))
+        slot = self.db.create_pkg_slot(self, '.'.join(parts[:self.level]))
+        self.slots.append(slot)
+        return slot
+
+    def __repr__(self):
+        return 'PkgInfo({}, {}, {!r}, {!r})'.format(
+            self.id, self.name, self.opts, self.slots)
+
+
+class SlotInfo():
+    def __init__(self, db, pkg, id, version, config, metadata):
+        self.db = db
+        self.pkg = pkg
+        self.id = id
+        self.version = Version(version)
+        self.config = config
+        self.metadata = metadata
+
+    def __repr__(self):
+        return 'SlotInfo({!r}, {}, {!r}, {!r}, {!r})'.format(
+            self.pkg, self.id, self.version, self.config, self.metadata)
+
+    def versions(self):
+        return self.db.get_versions(self)
+
+    def create(self, **kwargs):
+        return self.db.schedule_build(self, **kwargs)
+
+
+class VersionInfo():
+    def __init__(self, db, slot, id, version, config, metadata, populated):
+        self.db = db
+        self.slot = slot
+        self.id = id
+        self.version = Version(version)
+        self.config = config
+        self.metadata = metadata
+        self.populated = populated
+
+    def __repr__(self):
+        return 'VersionInfo({!r}, {}, {!r}, {!r}, {!r})'.format(
+            self.slot, self.id, self.version, self.config, self.metadata)
+
 
 class Database():
     rubygems = 'https://rubygems.org'
@@ -32,55 +94,82 @@ class Database():
         self.conn = psycopg2.connect(config.database)
         self.conn.autocommit = True
 
-    def register_gem(self, name, level, native=None):
+    def get_pkger(self, name):
         c = self.conn.cursor()
-        c.execute("""INSERT INTO gems (name, level, native)
-             VALUES (%s, %s, %s);""", ('rubygem:' + name, level, native))
-        self.conn.commit()
-
-    def create_gem_slot(self, name, slot):
-        c = self.conn.cursor()
-        c.execute("""INSERT INTO packages (name, slot)
-             VALUES (%s, %s);""", ('rubygem:' + name, list(slot)))
-        self.conn.commit()
-
-    def gem_info(self, name, autocreate=True):
-        c = self.conn.cursor()
-        c.execute('SELECT level, opts, native FROM gems WHERE name = %s', ('rubygem:' + name, ))
+        c.execute('SELECT id, config FROM packager WHERE name = %s',
+                  (name,))
         result = c.fetchone()
-        if result is None:
-            if not autocreate:
-                return None
-            print('Configure {}:'.format(name))
-            from urllib.request import urlopen
-            url = '{}/api/v1/versions/{}.json'.format(self.rubygems, name)
-            data = urlopen(url).read()
-            versions = json.loads(data.decode('utf-8'))
-            for version in versions:
-                print(version['number'] + ' ' + version['created_at'])
-            level = int(input('Level (1): ') or '1')
-            native = {'t': True, 'f': False, 'n': False, 'y': True, '': None}[input('Native?: ')]
-            self.register_gem(name, level, native=native)
-            return self.gem_info(name)
-        level, opts, native = result
-        if type(opts) is str:
-            opts = json.loads(opts)
-        slots = {}
-        c.execute('SELECT slot, metadata FROM packages WHERE name = %s', ('rubygem:' + name, ))
-        for slot, metadata in c:
-            if type(metadata) is str:
-                metadata = json.loads(metadata)
-            slots[tuple(slot)] = metadata
-        return PkgInfo(level, opts, native, slots)
+        if not result:
+            raise NotImplementedError('packager "{}" is not defined'
+                                      .format(name))
+        impl = import_module(result[1].pop('module'))
+        return getattr(impl, 'pkgerInfo')(self, result[0], **result[1])
 
-    def gem_slot_versions(self, name, slot):
+    def register_pkg(self, pkger_id, name, config):
         c = self.conn.cursor()
-        c.execute('SELECT DISTINCT version FROM package_versions WHERE name = %s and slot = %s ORDER BY version ASC',
-                  ('rubygem:' + name, list(slot)))
+        c.execute("""INSERT INTO packages (pkger_id, name, config)
+             VALUES (%s, %s, %s);""", (pkger_id, name, json.dumps(config)))
+        self.conn.commit()
+
+    def pkg_info(self, pkger_id, name, klass=PkgInfo, slotklass=SlotInfo):
+        c = self.conn.cursor()
+        c.execute('SELECT id, config FROM packages '
+                  'WHERE pkger_id = %s AND name = %s',
+                  (pkger_id, name))
+        result = c.fetchone()
+        if not result:
+            raise ValueError('Pkg "{}" unknown in pkger {}'.format(
+                    name, pkger_id))
+            return None
+        pkg_id, config = result
+
+        c.execute('SELECT id, version, config, metadata FROM slots '
+                  'WHERE pkg_id = %s ORDER BY version', (pkg_id,))
+        slots = []
+        pkg = klass(self, pkg_id, name, config, slots)
+        for row in c.fetchall():
+            slots.append(slotklass(self, pkg, *row))
+        return pkg
+
+    def create_pkg_slot(self, pkg, slot):
+        c = self.conn.cursor()
+        c.execute("""INSERT INTO slots (pkg_id, version) VALUES (%s, %s)
+                  RETURNING (id, version, config, metadata);""",
+                  (pkg.id, slot))
+        row = c.fetchone()
+        self.conn.commit()
+        return SlotInfo(self, pkg, *row)
+
+    def get_versions(self, slot):
+        c = self.conn.cursor()
+        c.execute('''SELECT id, version, config, metadata, populated
+                     FROM versions
+                     WHERE slot_id = %s
+                     ORDER BY version ASC''',
+                  (slot.id, ))
         versions = []
-        for version in c:
-            versions.append(list(version[0]))
+        for row in c:
+            versions.append(VersionInfo(self, slot, *row))
         return versions
+
+    def schedule_build(self, slot, *, version, revision,
+                       format=None, changelog, distribution,
+                       extra={}):
+        now = datetime.now(tz=tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z')
+        c = self.conn.cursor()
+        c.execute("""INSERT INTO versions
+                        (slot_id, version, config, populated, created_at)
+                     VALUES (%s, %s, %s, %s, %s)
+                     RETURNING (id);""",
+                  (slot.id, version, json.dumps(extra), False, now))
+        result = c.fetchone()
+        c.execute("""INSERT INTO revisions
+                        (version_id, version, scheduled_at, changelog)
+                     VALUES (%s, %s, %s, %s);""",
+                  (result[0], version + '-' + str(revision), now, changelog))
+        self.conn.commit()
+
+    # -- not ported - needed anymore?
 
     def gem_extra(self, name, slot, version, revision):
         c = self.conn.cursor()

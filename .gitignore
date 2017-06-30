@@ -2,3 +2,5 @@
 /cmds/__pycache__
 /work
 /test
+__pycache__
+.cache

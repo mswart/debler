@@ -29,6 +29,7 @@ CREATE TABLE versions (
   version debversion NOT NULL,
   config JSONB NOT NULL DEFAULT '{}',
   metadata JSONB NOT NULL DEFAULT '{}',
+  populated boolean NOT NULL DEFAULT false,
   published_at timestamptz NULL,
   created_at timestamptz NULL,
   UNIQUE (slot_id, version)
@@ -40,8 +41,11 @@ CREATE TABLE revisions (
   version debversion NOT NULL,
   scheduled_at timestamptz NOT NULL,
   builder varchar(60) NULL,
-  built_at timestamptz NOT NULL,
+  built_at timestamptz NULL,
   changelog TEXT,
   result VARCHAR NULL,
   UNIQUE (version_id, version)
 );
+
+# -> format or config.gem_format,
+# -> distributions

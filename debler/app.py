@@ -9,18 +9,15 @@ from dateutil.tz import tzlocal
 from debian.deb822 import Deb822, Dsc
 
 
-from debler.gemfile import Parser as GemfileParser
-from debler.gem import GemVersion
-from debler.npm import Parser as NpmParser
 from debler.builder import BaseBuilder
 from debler import config
 
 
 class AppInfo():
     def __init__(self, db, name, version, basedir, *, gemfile=None,
-                 homepage=None, description=None, executables=[], dirs=[],
-                 bundler_laucher=False, files=[], default_env=None,
-                 npm=None, ignore_gems=[]):
+                 homepage=None, description=None,
+                 files=[], dirs=[],
+                 **pkgers):
         self.db = db
         self.name = name
         if type(version) is list:
@@ -28,21 +25,14 @@ class AppInfo():
         else:
             self.version = tuple(int(i) for i in str(version).split('.'))
         self.basedir = basedir
-        if gemfile is not None:
-            self.gemfile = GemfileParser(os.path.join(self.basedir, gemfile), ignore_gems)
-        else:
-            self.gemfile = None
-        if npm is not None:
-            self.npm = NpmParser.parse(self.basedir, npm)
-        else:
-            self.npm = None
         self.homepage = homepage
         self.description = description
-        self.executables = executables
         self.dirs = dirs
         self.files = files
-        self.bundler_laucher = bundler_laucher
-        self.default_env = default_env
+        self.pkgers = []
+
+        for pkger, cfg in pkgers.items():
+            self.pkgers.append(db.get_pkger(pkger).appInfo(self, **cfg))
 
     @classmethod
     def fromyml(cls, db, filename):
@@ -52,57 +42,17 @@ class AppInfo():
         return cls(db, **data)
 
     def schedule_dep_builds(self):
-        if self.gemfile is not None:
-            self.schedule_gemdeps_builds()
-        if self.npm is not None:
-            self.npm.schedule_deps_builds(self.db)
+        for pkger in self.pkgers:
+            pkger.schedule_dep_builds()
 
-    def schedule_gemdeps_builds(self):
-        for name, gem in self.gems.items():
-            if not gem.version:
-                continue
-            info = self.db.gem_info(name)
-            slot = tuple(gem.version.limit(info.level).todb())
-            if gem.revision:
-                extra = {
-                    'repository': gem.remote,
-                    'revision': gem.revision
-                }
-                gem.version = GemVersion.fromstr(str(gem.version) + '.rev' + gem.revision)
-            else:
-                extra = {}
-            dbversion = gem.version.todb()
-            if slot not in info.slots:
-                self.db.create_gem_slot(name, slot)
-                self.db.create_gem_version(
-                    name, slot,
-                    version=dbversion, revision=1,
-                    changelog='Import newly into debler',
-                    distribution=config.distribution,
-                    extra=extra)
-                continue
-            versions = self.db.gem_slot_versions(name, slot)
-            if gem.revision:
-                if dbversion in versions:  # already build
-                    continue
-                self.db.create_gem_version(
-                    name, slot,
-                    version=dbversion, revision=1,
-                    changelog='Build from upstream repository',
-                    distribution=config.distribution,
-                    extra=extra)
-                continue
-            if dbversion > versions[-1]:
-                self.db.create_gem_version(
-                    name, slot,
-                    version=dbversion, revision=1,
-                    changelog='Update to version used in application',
-                    distribution=config.distribution,
-                    extra=extra)
 
-    @property
-    def gems(self):
-        return self.gemfile.gems
+class BasePackagerAppInfo():
+    def __init__(self, pkger, app):
+        self.pkger = pkger
+        self.app = app
+
+    def appIntegrator(self, builder):
+        return self.pkger.appIntegrator(self, builder)
 
 
 class AppBuilder(BaseBuilder):
@@ -113,6 +63,9 @@ class AppBuilder(BaseBuilder):
         self.orig_name = app.name
         self.deb_name = app.name
         self.package_upload = config.app_package_upload
+        self.packagers = []
+        for pkger in self.app.pkgers:
+            self.packagers.append(pkger.appIntegrator(self))
 
     @property
     def pkg_dir(self):
@@ -163,66 +116,13 @@ class AppBuilder(BaseBuilder):
         control = Deb822()
         control['Package'] = self.deb_name
         control['Architecture'] = 'all'
-        self.load_paths = {'all': []}
         self.installs = {'all': []}
         self.symlinks = {'all': []}
-        self.gem_metadatas = {}
-        self.binaries = []
         deps = []
-        natives = []
 
-        for name, gem in self.app.gems.items():
-            if not gem.version:  # included by path
-                assert gem.path is not None, 'gem "{!s}" does not have any version, but no path: {!r}!'.format(gem.name, gem)
-                self.load_paths['all'].append('/usr/share/{name}/{path}/{}'.format('lib', name=self.app.name, path=gem.path))
-                self.installs['all'].append((gem.path, '/usr/share/{name}/{path}'.format('lib', name=self.app.name, path=os.path.dirname(gem.path))))
-                continue
-            info = self.db.gem_info(name)
-            if info.get('buildgem', False):
-                # not needed during runtime
-                continue
-            slot = tuple(gem.version.limit(info.level).todb())
-            metadata = info.slots[slot]
-            self.gem_metadatas[name] = metadata
-            gem_slot_name = name + '-' + '.'.join([str(s) for s in slot])
-            self.symlinks['all'].append((
-                '/usr/share/rubygems-debler/{}/{}.gemspec'.format(gem_slot_name, name),
-                '/usr/share/{}/.debler/gems/specifications/{}-{}.gemspec'.format(self.app.name, name, str(gem.version))
-            ))
-            deb_dep = self.gemnam2deb(gem_slot_name)
-            for path in metadata.get('require_paths', []):
-                self.load_paths['all'].append('/usr/share/rubygems-debler/{name}/{}/'.format(path, name=gem_slot_name))
-            for binary in metadata['binaries']:
-                self.binaries.append((binary.split('/', 1)[1],
-                                      os.path.join('/usr/share/rubygems-debler', gem_slot_name, binary),
-                                      metadata.get('require', [])))
-            if info.native:
-                natives.append((deb_dep, gem_slot_name))
-            if gem.revision:
-                deps.append(self.gemnam2deb(name) + '-' + gem.revision)
-            elif gem.constraints:
-                for constraint in gem.constraints:
-                    if ' ' not in constraint:
-                        constraint = '= ' + constraint
-                    op, vers = constraint.split(' ')
-                    if op == '~>':
-                        up = vers.split('.')
-                        deps.append('{} (>= {})'.format(deb_dep, vers))
-                        if len(up) > info.level:
-                            up[-1] = '0'
-                            up[-2] = str(int(up[-2]) + 1)
-                            deps.append('{} (<= {})'.format(deb_dep, '.'.join(up)))
-                    else:
-                        deps.append('{} ({} {})'.format(deb_dep, {'=': '>=', '>': '>='}.get(op, op), vers))
-            else:
-                deps.append(deb_dep)
-        deps.append(' | '.join([self.deb_name + '-ruby' + ruby for ruby in config.rubies]))
-
-        if self.app.npm:
-            base_dir = '/usr/share/{}/{}'.format(self.app.name, self.app.npm.dir)
-            new_deps, new_symlinks = self.app.npm.needed_relations(base_dir)
-            deps.extend(new_deps)
-            self.symlinks['all'].extend(new_symlinks)
+        for pkger in self.packagers:
+            for action in pkger.generate_control_file():
+                print(action)
 
         deps.append('${shlibs:Depends}')
         deps.append('${misc:Depends}')

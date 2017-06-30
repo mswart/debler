@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
+from collections import namedtuple
 import os
-import sys
 import subprocess
 
 from debler import config
@@ -11,10 +11,6 @@ class BuildFailError(Exception):
 
 
 class BaseBuilder():
-    @staticmethod
-    def gemnam2deb(name):
-        return 'debler-rubygem-' + name.replace('_', '--')
-
     @staticmethod
     def npm2deb(name):
         return 'debler-node-' + name.replace('_', '--')
@@ -95,3 +91,7 @@ def publish(dir):
     subprocess.check_call(['gpg', '-abs', '-u', config.keyid, '-o', 'Release.gpg.new', 'Release'])
     os.rename('InRelease.new', 'InRelease')
     os.rename('Release.gpg.new', 'Release.gpg')
+
+
+Dependency = namedtuple('Dependecy', 'package dependency')
+Symlink = namedtuple('Symlink', 'package dest src')
