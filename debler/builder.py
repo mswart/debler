@@ -1,13 +1,28 @@
 #!/usr/bin/env python3
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 import os
 import subprocess
+
+from debian.deb822 import Deb822, Dsc
 
 from debler import config
 
 
 class BuildFailError(Exception):
     pass
+
+
+class SourceControl(OrderedDict):
+    pass
+
+Dependency = namedtuple('Dependecy', 'package dependency')
+BuildDependency = namedtuple('BuildDepency', 'dependency')
+Symlink = namedtuple('Symlink', 'package dest src')
+Package = namedtuple('Package', 'package architecture section description')
+Install = namedtuple('Install', 'package obj dest')
+InstallContent = namedtuple('InstallContent', 'package name dest content mode')
+DebianContent = namedtuple('InstallContent', 'name content mode')
+RuleAction = namedtuple('RuleAction', 'target cmd')
 
 
 class BaseBuilder():
@@ -51,13 +66,116 @@ Licence: See LICENCE file
   [LICENCE TEXT]
 """.format(self.orig_name))
 
+    def generate_control_file(self):
+        dsc = Dsc()
+        build_deps = []
+        packages = OrderedDict()
+        self.installs = {}
+        self.symlinks = {}
+
+        for item in self.generate_control_content():
+            print(item)
+            if isinstance(item, SourceControl):
+                for key, value in item.items():
+                    key = '-'.join([k.capitalize() for k in key.split('_')])
+                    dsc[key] = value
+            elif isinstance(item, BuildDependency):
+                build_deps.append(item.dependency)
+            elif isinstance(item, Package):
+                control = Deb822()
+                for key, value in item._asdict().items():
+                    key = '-'.join([k.capitalize() for k in key.split('_')])
+                    control[key] = value
+                packages[item.package] = (control, [])
+                self.installs[item.package] = []
+                self.symlinks[item.package] = []
+            elif isinstance(item, Dependency):
+                packages[item.package][1].append(item.dependency)
+            elif isinstance(item, Symlink):
+                self.symlinks[item.package].append((item.dest, item.src))
+            else:
+                raise NotImplementedError('Got unexcepted action item'
+                                          ' on control generation {!r}'.format(
+                                            item))
+
+        with open(self.debian_file('control'), 'wb') as control_file:
+            dsc['Build-Depends'] = ', '.join(build_deps)
+            dsc.dump(control_file)
+
+            for control, deps in packages.values():
+                if deps:
+                    control['Depends'] = ', '.join(deps)
+                control_file.write(b'\n')
+                control.dump(control_file)
+
+    def generate_rules_file(self):
+        rules = {}
+        for item in self.generate_rules_content():
+            print(item)
+            if isinstance(item, Install):
+                self.installs[item.package].append((item.obj, item.dest))
+            elif isinstance(item, Symlink):
+                self.symlinks[item.package].append((item.dest, item.src))
+            elif isinstance(item, RuleAction):
+                if item.target not in rules:
+                    rules[item.target] = []
+                if isinstance(item.cmd, list):
+                    cmd = ' '.join(item.cmd)
+                else:
+                    cmd = item.cmd
+                rules[item.target].append(cmd)
+            elif isinstance(item, InstallContent):
+                os.makedirs(os.path.dirname(self.debian_file(item.name)),
+                            exist_ok=True)
+                with open(self.debian_file(item.name), 'w') as f:
+                    f.write(item.content)
+                os.chmod(self.debian_file(item.name), item.mode)
+                self.installs[item.package].append((
+                    os.path.join('debian', item.name),
+                    item.dest
+                ))
+            elif isinstance(item, DebianContent):
+                os.makedirs(os.path.dirname(self.debian_file(item.name)),
+                            exist_ok=True)
+                with open(self.debian_file(item.name), 'w') as f:
+                    f.write(item.content)
+                os.chmod(self.debian_file(item.name), item.mode)
+            else:
+                raise NotImplementedError('Got unexcepted action item'
+                                          ' on rules generation {!r}'.format(
+                                            item))
+
+        with open(self.debian_file('rules'), 'w') as f:
+            f.write("#!/usr/bin/make -f\n%:\n\tdh $@\n")
+            for target in rules:
+                f.write('\noverride_dh_auto_{}:\n\t'.format(target))
+                f.write('\n\t'.join(rules[target]))
+                f.write('\n')
+        os.chmod(self.debian_file('rules'), 0o755)
+
+        for deb, installs in self.installs.items():
+            with open(self.debian_file(deb + '.install'), 'w') as f:
+                print(installs)
+                for file, dir in installs:
+                    f.write('{} {}\n'.format(file, dir))
+
+        for deb, symlinks in self.symlinks.items():
+            if not symlinks:
+                continue
+            with open(self.debian_file(deb + '.links'), 'w') as f:
+                for file, dir in symlinks:
+                    f.write('{} {}\n'.format(file, dir))
+
     def create_source_package(self):
         os.chdir(self.pkg_dir)
         subprocess.check_call(['dpkg-buildpackage', '-S', '-sa', '-d'])
 
     def upload_source_package(self):
-        changes = '{}_{}_source.changes'.format(self.deb_name, self.deb_version)
-        subprocess.check_call(['dput', self.package_upload, os.path.join(self.tmp_dir, changes)])
+        changes = '{}_{}_source.changes'.format(
+            self.deb_name, self.deb_version)
+        subprocess.check_call(['dput',
+                               self.package_upload,
+                               os.path.join(self.tmp_dir, changes)])
         os.unlink(os.path.join(self.tmp_dir, changes))
 
     def generate(self):
@@ -91,7 +209,3 @@ def publish(dir):
     subprocess.check_call(['gpg', '-abs', '-u', config.keyid, '-o', 'Release.gpg.new', 'Release'])
     os.rename('InRelease.new', 'InRelease')
     os.rename('Release.gpg.new', 'Release.gpg')
-
-
-Dependency = namedtuple('Dependecy', 'package dependency')
-Symlink = namedtuple('Symlink', 'package dest src')

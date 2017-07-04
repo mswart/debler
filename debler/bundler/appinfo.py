@@ -10,11 +10,10 @@ class BundlerAppInfo(BasePackagerAppInfo):
     def __init__(self, pkger, app, *,
                  subdir='.',
                  gemfile,
-                 executables=[], bundler_laucher=False,
+                 bundler_laucher=False,
                  default_env=None, ignore_gems=[]):
         super().__init__(pkger, app)
         self.gemfile = gemfile
-        self.executables = executables
         self.bundler_laucher = bundler_laucher
         self.default_env = default_env
 
@@ -24,14 +23,13 @@ class BundlerAppInfo(BasePackagerAppInfo):
 
     @classmethod
     def parse(cls, pkger, app, *, subdir='.',
-              executables=[], bundler_laucher=False,
+              bundler_laucher=False,
               default_env=None, ignore_gems=[]):
         basedir = os.path.realpath(os.path.join(app.basedir, subdir))
         gemfile = GemfileParser(os.path.join(basedir, 'Gemfile'), ignore_gems)
         return cls(pkger, app,
                    subdir=subdir,
                    gemfile=gemfile,
-                   executables=executables,
                    bundler_laucher=bundler_laucher,
                    default_env=default_env)
 

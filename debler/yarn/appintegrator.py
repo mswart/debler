@@ -3,7 +3,7 @@ class YarnAppIntegrator():
         self.pgker = pkger
         self.app = app
 
-    def generate_control_file(self):
+    def generate_control_content(self):
         if False:
             yield None
         return
@@ -11,3 +11,7 @@ class YarnAppIntegrator():
         new_deps, new_symlinks = self.app.npm.needed_relations(base_dir)
         deps.extend(new_deps)
         self.symlinks['all'].extend(new_symlinks)
+
+    def generate_rules_content(self):
+        if False:
+            yield None
