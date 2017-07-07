@@ -1,5 +1,4 @@
 import debler.db
-from debler.gem import GemVersion
 from debler import config
 
 

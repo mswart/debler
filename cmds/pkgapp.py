@@ -3,7 +3,7 @@ import sys
 from tempfile import TemporaryDirectory
 
 from debler.app import AppInfo, AppBuilder
-from debler.builder import publish, BuildFailError
+from debler.builder import BuildFailError
 from debler.db import Database
 
 
@@ -25,11 +25,9 @@ def run(args):
         builder = AppBuilder(db, d, app)
         builder.generate()
         try:
-            builder.build()
+            builder.run()
         except BuildFailError:
             sys.exit(5)
-
-    publish('app')
 
 
 def register(subparsers):

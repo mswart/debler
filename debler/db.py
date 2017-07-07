@@ -1,12 +1,13 @@
 from datetime import datetime
 from importlib import import_module
 import json
+import socket
 
-from debian import debian_support
 from dateutil.tz import tzlocal
+from debian import debian_support
 import psycopg2
+import psycopg2.extras
 
-from debler.gem import GemVersion
 from debler import config
 
 
@@ -173,6 +174,121 @@ class Database():
                    now, changelog))
         self.conn.commit()
 
+    def _dump_builds(self, *, result=None, ids=None):
+        c = self.conn.cursor()
+        sql = '''SELECT
+            rev.id,
+            packager.name AS pkger,
+            packages.name AS pkg,
+            slots.version AS slot,
+            rev.version AS version,
+            distributions.name AS distribution
+        FROM revisions AS rev
+        INNER JOIN distributions ON rev.distribution_id = distributions.id
+        INNER JOIN versions ON rev.version_id = versions.id
+        INNER JOIN slots ON versions.slot_id = slots.id
+        INNER JOIN packages ON slots.pkg_id = packages.id
+        INNER JOIN packager ON packages.pkger_id = packager.id
+        '''
+        values = []
+        if ids is not None:
+            sql += ' WHERE rev.id = ANY(%s)'
+            sql += ' ORDER BY array_position(%s, rev.id)'
+            values.append(ids)
+            values.append(ids)
+        elif result is None:
+            sql += ' WHERE rev.result IS NULL'
+        else:
+            sql += ' WHERE rev.result = %s'
+            values.append(result)
+        c.execute(sql, tuple(values))
+        for pkg in c:
+            yield pkg
+
+    def _iter_builds(self, *args):
+        while True:
+            for build in self._dump_builds(*args):
+                yield build
+                break
+            else:
+                # no build return from dump_builds, end while loop
+                break
+
+    def scheduled_builds(self, all=False):
+        query_by = self._dump_builds if all else self._iter_builds
+        yield from query_by(result=None)
+
+    def failed_builds(self, all=False):
+        query_by = self._dump_builds if all else self._iter_builds
+        yield from query_by(result='failed')
+
+    def builds_by_id(self, build_ids, *, all=False):
+        yield from self._dump_builds(ids=build_ids)
+
+    def claim_build(self, build_id):
+        now = datetime.now(tz=tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z')
+        c = self.conn.cursor()
+        c.execute('''UPDATE revisions SET
+                        builder = %s,
+                        built_at = %s
+                     WHERE id = %s''',
+                  (socket.getfqdn(), now, build_id))
+        self.conn.commit()
+
+    def update_build(self, build_id, *, result):
+        c = self.conn.cursor()
+        c.execute('''UPDATE revisions SET
+                        result = %s
+                     WHERE id = %s''',
+                  (result, build_id))
+        self.conn.commit()
+
+    def build_data(self, build_id):
+        c = self.conn.cursor(cursor_factory=psycopg2.extras.NamedTupleCursor)
+        sql = '''SELECT
+            rev.id AS id,
+            packager.name AS pkger,
+            packages.name AS pkg,
+            slots.version AS slot,
+            slots.id AS slot_id,
+            versions.version AS version,
+            versions.config AS version_config,
+            rev.version AS revision,
+            distributions.name AS distribution
+        FROM revisions AS rev
+        INNER JOIN distributions ON rev.distribution_id = distributions.id
+        INNER JOIN versions ON rev.version_id = versions.id
+        INNER JOIN slots ON versions.slot_id = slots.id
+        INNER JOIN packages ON slots.pkg_id = packages.id
+        INNER JOIN packager ON packages.pkger_id = packager.id
+        WHERE rev.id = %s
+        '''
+        c.execute(sql, (build_id, ))
+        return c.fetchone()
+
+    def changelog_entries(self, build_id):
+        c = self.conn.cursor()
+        c.execute("""
+            WITH org AS (SELECT * from revisions WHERE id = %s)
+            SELECT
+                revs.version,
+                revs.scheduled_at,
+                revs.changelog,
+                dists.name AS distribution
+            FROM revisions AS revs
+            INNER JOIN distributions dists ON revs.distribution_id = dists.id
+            WHERE revs.version <= (SELECT version FROM org)
+              AND revs.distribution_id = (SELECT distribution_id FROM org)
+            ORDER BY revs.version ASC;
+            """, (build_id, ))
+        yield from c
+
+    def set_slot_metadata(self, slot_id, metadata):
+        c = self.conn.cursor()
+        c.execute('UPDATE slots SET metadata = %s WHERE id = %s',
+                  (json.dumps(metadata), slot_id))
+        self.conn.commit()
+
     # -- not ported - needed anymore?
 
     def gem_extra(self, name, slot, version, revision):
@@ -239,40 +355,6 @@ class Database():
                   (json.dumps(metadata), 'rubygem:' + name, list(slot)))
         self.conn.commit()
 
-    def _iter_builds(self, state):
-        c = self.conn.cursor()
-        while True:
-            c.execute('''SELECT split_part(name, ':', 1), split_part(name, ':', 2), slot, version, revision
-                         FROM package_versions
-                         WHERE state = %s
-                         LIMIT 1''', (state, ))
-            pkg = c.fetchone()
-            if pkg:
-                yield pkg
-            else:
-                break
-
-    def _dump_builds(self, state):
-        c = self.conn.cursor()
-        c.execute('''SELECT split_part(name, ':', 1), split_part(name, ':', 2), slot, version, revision
-                     FROM package_versions
-                     WHERE state = %s''', (state, ))
-        for pkg in c:
-            yield pkg
-
-    def scheduled_builds(self, all=False):
-        yield from (self._dump_builds if all else self._iter_builds)('scheduled')
-
-    def failed_builds(self, all=False):
-        yield from (self._dump_builds if all else self._iter_builds)('failed')
-
-    def update_build(self, pkger, name, slot, version, revision, state):
-        c = self.conn.cursor()
-        c.execute('UPDATE package_versions SET state = %s'
-                  + ' WHERE name = %s AND slot = %s AND version = %s AND revision = %s',
-                  (state, pkger + ':' + name, slot, version, revision))
-        self.conn.commit()
-
     def create_gem_version(self, name, slot, *, version, revision,
                            format=None, changelog, distribution,
                            extra={}):
@@ -295,15 +377,6 @@ class Database():
                   ('npm:' + name, list(slot), version, revision, format or config.gem_format,
                    now, changelog, distribution))
         self.conn.commit()
-
-    def changelog_entries(self, pkger, name, slot, until_version):
-        c = self.conn.cursor()
-        c.execute("""SELECT version, revision, scheduled_at, changelog, distribution
-            FROM package_versions
-            WHERE name=%s AND slot = %s AND version <= %s
-            ORDER BY version ASC, revision ASC;""", (pkger + ':' + name, list(slot), list(until_version)))
-        for version, revision, scheduled_at, changelog, distribution in c:
-            yield (GemVersion(version), revision, scheduled_at, changelog, distribution)
 
     def gem_format_rebuild(self, changelog):
         c = self.conn.cursor()

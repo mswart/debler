@@ -17,6 +17,7 @@ class SourceControl(OrderedDict):
 
 Dependency = namedtuple('Dependecy', 'package dependency')
 BuildDependency = namedtuple('BuildDepency', 'dependency')
+Provide = namedtuple('Provide', 'package provide')
 Symlink = namedtuple('Symlink', 'package dest src')
 Package = namedtuple('Package', 'package architecture section description')
 Install = namedtuple('Install', 'package obj dest')
@@ -78,6 +79,9 @@ Licence: See LICENCE file
             if isinstance(item, SourceControl):
                 for key, value in item.items():
                     key = '-'.join([k.capitalize() for k in key.split('_')])
+                    if key == 'Description':
+                        value = value.replace('\n\n', '\n.\n') \
+                                     .replace('\n', '\n ')
                     dsc[key] = value
             elif isinstance(item, BuildDependency):
                 build_deps.append(item.dependency)
@@ -85,12 +89,17 @@ Licence: See LICENCE file
                 control = Deb822()
                 for key, value in item._asdict().items():
                     key = '-'.join([k.capitalize() for k in key.split('_')])
+                    if key == 'Description':
+                        value = value.replace('\n\n', '\n.\n') \
+                                     .replace('\n', '\n ')
                     control[key] = value
-                packages[item.package] = (control, [])
+                packages[item.package] = (control, [], [])
                 self.installs[item.package] = []
                 self.symlinks[item.package] = []
             elif isinstance(item, Dependency):
                 packages[item.package][1].append(item.dependency)
+            elif isinstance(item, Provide):
+                packages[item.package][2].append(item.provide)
             elif isinstance(item, Symlink):
                 self.symlinks[item.package].append((item.dest, item.src))
             else:
@@ -102,9 +111,11 @@ Licence: See LICENCE file
             dsc['Build-Depends'] = ', '.join(build_deps)
             dsc.dump(control_file)
 
-            for control, deps in packages.values():
+            for control, deps, provides in packages.values():
                 if deps:
                     control['Depends'] = ', '.join(deps)
+                if provides:
+                    control['Provides'] = ', '.join(provides)
                 control_file.write(b'\n')
                 control.dump(control_file)
 
@@ -185,7 +196,7 @@ Licence: See LICENCE file
         self.create_source_package()
         self.upload_source_package()
 
-    def build(self):
+    def run(self):
         os.chdir(self.slot_dir)
 
         try:
@@ -199,13 +210,3 @@ Licence: See LICENCE file
             raise BuildFailError()
         changes = '{}_{}_amd64.changes'.format(self.deb_name, self.deb_version)
         subprocess.check_call(['dput', self.package_upload, os.path.join(self.tmp_dir, changes)])
-
-
-def publish(dir):
-    os.chdir(getattr(config, dir + 'dir'))
-    subprocess.check_call(['apt-ftparchive', 'packages', '.'], stdout=open('Packages', 'wb'))
-    subprocess.check_call(['apt-ftparchive', 'release', '.'], stdout=open('Release', 'wb'))
-    subprocess.check_call(['gpg', '--clearsign', '-u', config.keyid, '-o', 'InRelease.new', 'Release'])
-    subprocess.check_call(['gpg', '-abs', '-u', config.keyid, '-o', 'Release.gpg.new', 'Release'])
-    os.rename('InRelease.new', 'InRelease')
-    os.rename('Release.gpg.new', 'Release.gpg')

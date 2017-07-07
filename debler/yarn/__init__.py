@@ -11,8 +11,4 @@ class YarnPackager(Packager):
       'appIntegrator': YarnAppIntegrator,
     }
 
-    def __getattr__(self, name):
-        if name in self.wrapped:
-            return functools.partial(self.wrapped[name], self)
-
 pkgerInfo = YarnPackager

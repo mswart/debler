@@ -1,7 +1,7 @@
 import lepl
 import os
 
-from debler.gem import GemVersion
+from .builder import GemVersion
 
 
 def build_str(s):

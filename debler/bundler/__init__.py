@@ -1,21 +1,17 @@
-import functools
-
 import json
 
 from ..pkger import Packager
 from .appinfo import BundlerAppInfo
 from .appintegrator import BundlerAppIntegrator
+from .builder import GemBuilder
 
 
 class BundlerPackager(Packager):
     wrapped = {
       'appInfo': BundlerAppInfo.parse,
       'appIntegrator': BundlerAppIntegrator,
+      'builder': GemBuilder,
     }
-
-    def __getattr__(self, name):
-        if name in self.wrapped:
-            return functools.partial(self.wrapped[name], self)
 
     def gem_info(self, name, autocreate=False):
         try:
@@ -46,4 +42,3 @@ class BundlerPackager(Packager):
             return self.db.pkg_info(self.id, name)
 
 pkgerInfo = BundlerPackager
-9

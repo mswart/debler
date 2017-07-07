@@ -1,11 +1,10 @@
-import traceback
-from tempfile import TemporaryDirectory
+from functools import partial
 import sys
+from tempfile import TemporaryDirectory
+import traceback
 
 from debler.db import Database
-from debler.gem import GemBuilder, GemVersion
-from debler.npm import NpmBuilder
-from debler.builder import publish, BuildFailError
+from debler.builder import BuildFailError
 
 
 def header(content, color=33):
@@ -16,11 +15,6 @@ def header(content, color=33):
     print('#'*80)
     print('#'*80)
 
-pkers = {
-    'rubygem': GemBuilder,
-    'npm': NpmBuilder,
-}
-
 
 def run(args):
     db = Database()
@@ -29,36 +23,35 @@ def run(args):
     successful = 0
 
     if args.builds:
-        builds = lambda all: args.builds
+        builds = partial(db.builds_by_id, args.builds)
     elif args.retry:
         builds = db.failed_builds
     else:
         builds = db.scheduled_builds
 
-    for pkger, *data in builds(all=args.print_builds):
+    for build_id, *data in builds(all=args.print_builds):
         if args.print_builds:
-            print('{}:{}:{}:{}-{}'.format(pkger, data[0], '.'.join(str(i) for i in data[1]), '.'.join(str(i) for i in data[2]), data[3]))
+            print('{}:{},{},{},{},{}'.format(build_id, *data))
             continue
-        task = '{}:{} in version {}-{}'.format(data[0], GemVersion(data[1]), GemVersion(data[2]), data[3])
+        task = '{}: {}\'s {} in version {}:{} ({})'.format(build_id, *data)
         header(task)
         try:
-            db.update_build(pkger, *data, state='generating')
+            db.claim_build(build_id)
             with TemporaryDirectory() as d:
-                conv = pkers[pkger](db, d, *data)
-                conv.generate()
-                db.update_build(pkger, *data, state='building')
-                conv.build()
-            db.update_build(pkger, *data, state='finished')
+                builder = db.get_pkger(data[0]).builder(d, build_id)
+                builder.generate()
+                builder.run()
+            db.update_build(build_id, result='finished')
             header(task, color=32)
             successful += 1
         except BuildFailError:
-            db.update_build(pkger, *data, state='failed')
+            db.update_build(build_id, result='failed')
             failed += 1
             header(task, color=31)
             if args.fail_fast:
                 break
         except Exception:
-            db.update_build(pkger, *data, state='failed')
+            db.update_build(build_id, result='failed')
             failed += 1
             traceback.print_exc()
             header(task, color=31)
@@ -71,20 +64,11 @@ def run(args):
     if args.print_builds:
         return
 
-    publish('gem')
-
-    print('Built {} packages: {} successful, {} failed'.format(total, successful, failed))
+    print('Built {} packages: {} successful, {} failed'.format(
+          total, successful, failed))
 
     if failed:
         sys.exit(1)
-
-
-def build(arg):
-    arg, revision = arg.rsplit('-', 1)  # slots/versions could have negative numbers (-)
-    pkger, name, slot, version = arg.split(':')
-    slot = [int(s) for s in slot.split('.')]
-    version = [int(s) for s in version.split('.')]
-    return (pkger, name, slot, version, int(revision))
 
 
 def register(subparsers):
@@ -95,7 +79,7 @@ def register(subparsers):
                         help='Build at most n packages',
                         metavar='n')
     parser.add_argument('--print-builds', '-P', action='store_true')
-    parser.add_argument('builds', nargs='*', metavar='builds',
-                        type=build,
+    parser.add_argument('builds', nargs='*', metavar='BUILDID',
+                        type=int,
                         help='Specify build list explicit')
     parser.set_defaults(run=run)
