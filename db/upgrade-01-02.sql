@@ -87,16 +87,23 @@ CREATE TABLE versions (
   UNIQUE (slot_id, version)
 );
 
+CREATE TABLE distributions (
+  id SERIAL PRIMARY KEY,
+  name varchar(30) NOT NULL,
+  UNIQUE(name)
+);
+
 CREATE TABLE revisions (
   id SERIAL PRIMARY KEY,
   version_id integer NOT NULL REFERENCES  versions(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  distribution_id integer NOT NULL REFERENCES distributions(id) ON DELETE CASCADE ON UPDATE CASCADE,
   version debversion NOT NULL,
   scheduled_at timestamptz NOT NULL,
   builder varchar(60) NULL,
   built_at timestamptz NULL,
   changelog TEXT,
   result VARCHAR NULL,
-  UNIQUE (version_id, version)
+  UNIQUE (version_id, distribution_id, version)
 );
 
 
@@ -140,7 +147,10 @@ INSERT INTO versions (slot_id, version, created_at) SELECT
   GROUP BY package_versions.name, package_versions.slot, package_versions.version;
 
 
-INSERT INTO revisions (version_id, version, changelog, scheduled_at, built_at, result) SELECT
+INSERT INTO distributions (name) SELECT DISTINCT distribution FROM package_versions;
+
+
+INSERT INTO revisions (version_id, distribution_id, version, changelog, scheduled_at, built_at, result) SELECT
   (SELECT id FROM
   versions
   WHERE slot_id = (SELECT id
@@ -152,6 +162,8 @@ INSERT INTO revisions (version_id, version, changelog, scheduled_at, built_at, r
            AND pkger_id = (SELECT id FROM packager
                 WHERE packager.name = split_part(package_versions.name, ':', 1))))
     AND versions.version = version2str(package_versions.version)),
+  (SELECT id FROM distributions
+    WHERE distributions.name = package_versions.distribution),
   version2str(version) || '-' || revision::text,
   changelog,
   scheduled_at,

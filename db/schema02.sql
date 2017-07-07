@@ -35,17 +35,23 @@ CREATE TABLE versions (
   UNIQUE (slot_id, version)
 );
 
+CREATE TABLE distributions (
+  id SERIAL PRIMARY KEY,
+  name varchar(30) NOT NULL,
+  UNIQUE(name)
+);
+
 CREATE TABLE revisions (
   id SERIAL PRIMARY KEY,
   version_id integer NOT NULL REFERENCES  versions(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  distribution_id integer NOT NULL REFERENCES distributions(id) ON DELETE CASCADE ON UPDATE CASCADE,
   version debversion NOT NULL,
   scheduled_at timestamptz NOT NULL,
   builder varchar(60) NULL,
   built_at timestamptz NULL,
   changelog TEXT,
   result VARCHAR NULL,
-  UNIQUE (version_id, version)
+  UNIQUE (version_id, distribution_id, version)
 );
 
 # -> format or config.gem_format,
-# -> distributions

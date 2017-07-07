@@ -163,10 +163,14 @@ class Database():
                      RETURNING (id);""",
                   (slot.id, version, json.dumps(extra), False, now))
         result = c.fetchone()
+        c.execute("""SELECT id FROM distributions
+                     WHERE name = %s""", (distribution, ))
+        distribution_id = c.fetchone()[0]
         c.execute("""INSERT INTO revisions
-                        (version_id, version, scheduled_at, changelog)
-                     VALUES (%s, %s, %s, %s);""",
-                  (result[0], version + '-' + str(revision), now, changelog))
+            (version_id, distribution_id, version, scheduled_at, changelog)
+                     VALUES (%s, %s, %s, %s, %s);""",
+                  (result[0], distribution_id, version + '-' + str(revision),
+                   now, changelog))
         self.conn.commit()
 
     # -- not ported - needed anymore?
