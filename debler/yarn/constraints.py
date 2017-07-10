@@ -1,3 +1,5 @@
+import re
+
 import lepl
 
 import debler.constraints
@@ -27,14 +29,19 @@ class Range():
 class Version():
     def __init__(self, parts):
         self.parts = parts
-        while parts[-1] == 'x':
+        while parts and parts[-1] == 'x':
             parts.pop()
 
     def special(self):
         return len(self.parts) > 3
 
-    def __repr__(self):
-        return 'v{}'.format('.'.join(str(r) for r in self.parts))
+    def __str__(self):
+        if self.special():
+            return '.'.join(str(r) for r in self.parts[:3]) + '-' + self.parts[-1]
+        return '.'.join(str(r) for r in self.parts)
+
+    def __eq__(self, other):
+        return str(self) == str(other)
 
 
 class Operator():
@@ -95,8 +102,6 @@ for cls in Operator.__subclasses__():
 def select_operator(op, version):
     return ops_by_char[op](version)
 
-print(ops_by_char)
-
 
 nr = lepl.UnsignedInteger() > expand(int)
 xr = lepl.Literal('x') | lepl.Literal('X') | lepl.Literal('*') | nr
@@ -106,7 +111,7 @@ parts = part & lepl.Star(lepl.Literal('.') & part)
 build = parts
 pre = parts
 qualifier = lepl.Optional(lepl.Literal('-') & pre) \
-     & lepl.Optional(lepl.Literal('+') & build)
+    & lepl.Optional(lepl.Literal('+') & build)
 
 partial = xr & lepl.Optional(
     ~lepl.Literal('.') & xr &
@@ -133,37 +138,58 @@ def parseVersion(version):
     version = version.strip()
     if version == '*':
         return debler.constraints.all
-    raise ValueError(version)
+    if '-' in version:
+        main, special = version.split('-')
+        return Version(main.split('.') + [special])
+    else:
+        return Version(version.split('.'))
 
 
 def parseConstraints(constraints):
     if not constraints.strip():
         return debler.constraints.all
+    if constraints.strip() == '*':
+        return debler.constraints.all
     # move range versions into own token:
     constraints = constraints.replace(' - ', '#')
+    if ' ' in constraints:
+        constraints = re.sub(r'([!^<>=]+) +', '\\1', constraints)
     orRawParts = [orPart.strip() for orPart in constraints.split('||')]
     orParts = []
     for part in orRawParts:
-        # todo strip white spaces around operators
         andParts = []
         for part in part.split(' '):
             if '#' in part:  # range
                 a, b = part.split('#')
                 andParts.append(Ge(parseVersion(a)))
                 andParts.append(Le(parseVersion(b)))
+                continue
+            if part.startswith('^'):
+                version = parseVersion(part[1:])
+                andParts.append(debler.constraints.GreaterEqual(version))
+                upperVersion = Version([])
+                for part in version.parts:
+                    if part == '0':
+                        upperVersion.parts.append(part)
+                    else:
+                        upperVersion.parts.append(int(part) + 1)
+                        break
+                else:  # we have only 0 as parts (like ^0.0 or ^0.0.x)
+                    andParts.append(debler.constraints.LessThan(Version(['0', '1'])))
+                    continue
+                andParts.append(debler.constraints.LessThan(upperVersion))
+                continue
             for op in ops_by_char:
                 if part.startswith(op):
                     raise ValueError((op, part))
             andParts.append(Exact(parseVersion(part)))
-        print(andParts)
         # todo range
         if len(andParts) == 1:
             orParts.append(andParts[0])
         else:
-            orParts.append(And(andParts))
-    print('or', orParts)
+            orParts.append(debler.constraints.And(andParts))
     if len(orParts) == 1:
         return orParts[0]
     else:
-        return Or(orParts)
+        return debler.constraints.Or(orParts)
     # return rangeSet.parse(str)

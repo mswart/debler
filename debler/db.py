@@ -16,10 +16,11 @@ class Version(debian_support.Version):
 
 
 class PkgInfo():
-    def __init__(self, db, id, name, opts, slots):
+    def __init__(self, db, id, name, deb_name, opts, slots):
         self.db = db
         self.id = id
         self.name = name
+        self.deb_name = deb_name
         self.opts = opts
         self.slots = slots
 
@@ -44,7 +45,7 @@ class PkgInfo():
         if not create:
             raise ValueError('No slot for version "{}" ({!r})'.format(
                              version, self))
-        slot = self.db.create_pkg_slot(self, '.'.join(parts[:self.level]))
+        slot = self.db.create_pkg_slot(self, '.'.join(parts[:self.lookup('level', 1)]))
         self.slots.append(slot)
         return slot
 
@@ -65,6 +66,16 @@ class SlotInfo():
     def __repr__(self):
         return 'SlotInfo({!r}, {}, {!r}, {!r}, {!r})'.format(
             self.pkg, self.id, self.version, self.config, self.metadata)
+
+    @property
+    def min_version(self):
+        return self.version
+
+    @property
+    def max_version(self):
+        parts = str(self.version).split('.')
+        parts[-1] = str(int(parts[-1]) + 1)
+        return Version('.'.join(parts) + '~~~')
 
     def versions(self):
         return self.db.get_versions(self)
@@ -112,7 +123,8 @@ class Database():
              VALUES (%s, %s, %s);""", (pkger_id, name, json.dumps(config)))
         self.conn.commit()
 
-    def pkg_info(self, pkger_id, name, klass=PkgInfo, slotklass=SlotInfo):
+    def pkg_info(self, pkger_id, name, deb_name,
+                 klass=PkgInfo, slotklass=SlotInfo):
         c = self.conn.cursor()
         c.execute('SELECT id, config FROM packages '
                   'WHERE pkger_id = %s AND name = %s',
@@ -120,14 +132,14 @@ class Database():
         result = c.fetchone()
         if not result:
             raise ValueError('Pkg "{}" unknown in pkger {}'.format(
-                    name, pkger_id))
+                name, pkger_id))
             return None
         pkg_id, config = result
 
         c.execute('SELECT id, version, config, metadata FROM slots '
                   'WHERE pkg_id = %s ORDER BY version', (pkg_id,))
         slots = []
-        pkg = klass(self, pkg_id, name, config, slots)
+        pkg = klass(self, pkg_id, name, deb_name, config, slots)
         for row in c.fetchall():
             slots.append(slotklass(self, pkg, *row))
         return pkg
@@ -205,9 +217,9 @@ class Database():
         for pkg in c:
             yield pkg
 
-    def _iter_builds(self, *args):
+    def _iter_builds(self, *args, **kwargs):
         while True:
-            for build in self._dump_builds(*args):
+            for build in self._dump_builds(*args, **kwargs):
                 yield build
                 break
             else:

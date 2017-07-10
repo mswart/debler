@@ -8,14 +8,14 @@ from .builder import GemBuilder
 
 class BundlerPackager(Packager):
     wrapped = {
-      'appInfo': BundlerAppInfo.parse,
-      'appIntegrator': BundlerAppIntegrator,
-      'builder': GemBuilder,
+        'appInfo': BundlerAppInfo.parse,
+        'appIntegrator': BundlerAppIntegrator,
+        'builder': GemBuilder,
     }
 
     def gem_info(self, name, autocreate=False):
         try:
-            return self.db.pkg_info(self.id, name)
+            return self.db.pkg_info(self.id, name, self.name2deb(name))
         except ValueError as e:
             if not autocreate:
                 raise e
@@ -39,6 +39,9 @@ class BundlerPackager(Packager):
                     'native': native
                 }
             })
-            return self.db.pkg_info(self.id, name)
+            return self.db.pkg_info(self.id, name, self.name2deb(name))
+
+    def name2deb(self, name):
+        return 'debler-rubygem-' + name.replace('_', '--')
 
 pkgerInfo = BundlerPackager

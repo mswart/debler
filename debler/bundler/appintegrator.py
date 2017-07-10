@@ -62,8 +62,8 @@ class BundlerAppIntegrator():
             for binary in slot.metadata.get('binaries', []):
                 self.binaries.append((binary.split('/', 1)[1],
                                       os.path.join(
-                                        '/usr/share/rubygems-debler',
-                                        gem_slot_name, binary),
+                                          '/usr/share/rubygems-debler',
+                                          gem_slot_name, binary),
                                       slot.metadata.get('require', [])))
             if info.native:
                 self.natives.append((deb_dep, gem_slot_name))
