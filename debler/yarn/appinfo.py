@@ -3,6 +3,8 @@ import os.path
 
 from .lock import YarnLockParser
 from debler.app import BasePackagerAppInfo
+from ..db import Version
+from debler import config
 
 
 class YarnAppInfo(BasePackagerAppInfo):
@@ -35,6 +37,7 @@ class YarnAppInfo(BasePackagerAppInfo):
         self.dependencies.update(self.runtimeDependencies)
         if withDevDependencies:
             self.dependencies.update(self.devDependencies)
+        self.lock = lock
 
     @classmethod
     def parse(cls, pkger, app, *, subdir='.', withDevDependencies=True):
@@ -50,32 +53,17 @@ class YarnAppInfo(BasePackagerAppInfo):
                    **opts)
 
     def schedule_dep_builds(self):
-        return
-        for pkg, constraint in self.dependencies.items():
-            _, slots = db.npm_info(pkg)
-            print(pkg, '-', constraint)
-            import pprint
-            range.config.flatten().optimize_or().no_memoize()
-            pprint.pprint(range.parse(constraint))
-            if not constraint[0].isdigit():
-                op = constraint[0]
-                version = tuple(int(v) for v in constraint[1:].split('.'))
-            else:
-                op = '='
-                version = tuple(int(v) for v in constraint.split('.'))
-            if op == '^':
-                slot = (version[0],)
-            elif op in '=~':  # TODO iterate over slots
-                slot = (version[0], version[1])
-            else:
-                raise NotImplementedError('unknown npm operator {} in ({}: {})'.format(op, pkg, constraint))
-            if slot not in slots.keys():
-                db.create_npm_slot(pkg, slot)
-            versions = db.npm_slot_versions(pkg, slot)
-            if not versions or versions[-1] < version:
-                db.schedule_npm_version(
-                    pkg, slot,
-                    version=list(version), revision=1,
+        for pkg in self.lock.pkgs.values():
+            info = self.pkger.pkg_info(pkg.name, autocreate=True)
+            slot = info.slot_for_version(pkg.version, create=True)
+            versions = slot.versions()
+            if len(versions) < 1:
+                slot.create(
+                    version=pkg.version, revision=1,
                     changelog='Import newly into debler',
                     distribution=config.distribution)
-        raise ValueError()
+            elif Version(pkg.version) > versions[-1].version:
+                slot.create(
+                    version=pkg.version, revision=1,
+                    changelog='Update to version used in application',
+                    distribution=config.distribution)

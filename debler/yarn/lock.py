@@ -8,6 +8,14 @@ class PkgInfo():
         self.resolved = resolved
         self.dependencies = dependencies
 
+    def __repr__(self):
+        return 'PkgInfo({!r}, {!r}, {!r}, {!r}, {!r})'.format(
+            self.name,
+            self.constraints,
+            self.version,
+            self.resolved,
+            self.dependencies)
+
 
 class YarnLockParser():
     def __init__(self, content):

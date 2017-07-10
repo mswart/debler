@@ -135,7 +135,7 @@ class Database():
     def create_pkg_slot(self, pkg, slot):
         c = self.conn.cursor()
         c.execute("""INSERT INTO slots (pkg_id, version) VALUES (%s, %s)
-                  RETURNING (id, version, config, metadata);""",
+                  RETURNING id, version, config, metadata;""",
                   (pkg.id, slot))
         row = c.fetchone()
         self.conn.commit()
