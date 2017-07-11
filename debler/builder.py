@@ -24,6 +24,7 @@ Install = namedtuple('Install', 'package obj dest')
 InstallContent = namedtuple('InstallContent', 'package name dest content mode')
 DebianContent = namedtuple('InstallContent', 'name content mode')
 RuleAction = namedtuple('RuleAction', 'target cmd')
+RuleOverride = namedtuple('RuleOverride', 'target')
 
 
 class BaseBuilder():
@@ -127,6 +128,9 @@ Licence: See LICENCE file
                 self.installs[item.package].append((item.obj, item.dest))
             elif isinstance(item, Symlink):
                 self.symlinks[item.package].append((item.dest, item.src))
+            elif isinstance(item, RuleOverride):
+                if item.target not in rules:
+                    rules[item.target] = []
             elif isinstance(item, RuleAction):
                 if item.target not in rules:
                     rules[item.target] = []

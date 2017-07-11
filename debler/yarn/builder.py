@@ -11,7 +11,7 @@ from debler import config
 from debler.builder import BaseBuilder, \
     SourceControl, Package, \
     BuildDependency, Dependency, Provide, \
-    Install
+    Install, RuleOverride
 from .appinfo import YarnAppInfo
 from .constraints import parseConstraints
 from ..constraints import dependencies4Constraints
@@ -51,8 +51,6 @@ class YarnBuilder(BaseBuilder):
         with tarfile.open(name=self.src_file, mode='r:gz') as t:
             metadata = t.extractfile('package/package.json').read().decode('utf-8')
             self.metadata = YarnAppInfo(self.pkger, None, lock=None, dir=None, **json.loads(metadata))
-            print(self.metadata.runtimeDependencies)
-            print(self.metadata.devDependencies)
             print(self.metadata.dependencies)
 
     def create_dirs(self):
@@ -123,8 +121,14 @@ class YarnBuilder(BaseBuilder):
             description='not known ...',
         )
         yield Provide(self.deb_name, self.npm2deb(self.orig_name))
-        if len(self.pkg_slot) > 1:
-            yield Provide(self.deb_name, self.npm2deb(self.orig_name) + '-' + self.pkg_version)
+        if self.build.version != self.build.slot:
+            yield Provide(self.deb_name, self.npm2deb(self.build.pkg) + '-' + self.build.version)
+        version_parts = self.build.version.split('.')
+        if version_parts[0] != '0':
+            yield Provide(self.deb_name, self.npm2deb(self.build.pkg) +
+                '-' + '.'.join(version_parts[:2]))
+        yield Provide(self.deb_name, self.npm2deb(self.build.pkg) +
+                '-' + self.build.version)
         yield Dependency(self.deb_name, 'nodejs')
 
         # todo
@@ -152,6 +156,10 @@ class YarnBuilder(BaseBuilder):
             changes.write_to_open_file(f)
 
     def generate_rules_content(self):
+        yield RuleOverride('clean')
+        yield RuleOverride('build')
+        yield RuleOverride('test')
+
         with tarfile.open(self.tarxz_file, 'r:xz') as t:
             members = t.getmembers()
             for member in members:
