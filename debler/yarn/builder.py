@@ -163,6 +163,8 @@ class YarnBuilder(BaseBuilder):
         with tarfile.open(self.tarxz_file, 'r:xz') as t:
             members = t.getmembers()
             for member in members:
+                if member.name.endswith('.un~'):
+                    continue
                 yield Install(
                     self.deb_name,
                     '/'.join(member.name.split('/')[1:]),
