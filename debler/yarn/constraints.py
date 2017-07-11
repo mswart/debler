@@ -40,7 +40,7 @@ def parseVersion(version):
     if version == '*':
         return all
     if '-' in version:
-        main, special = version.split('-')
+        main, special = version.split('-', 1)
         return Version(main.split('.') + [special])
     else:
         return Version(version.split('.'))

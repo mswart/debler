@@ -22,6 +22,6 @@ class YarnPackager(Packager):
             return self.db.pkg_info(self.id, name, self.name2deb(name))
 
     def name2deb(self, name):
-        return 'debler-yarn-' + name.replace('_', '--')
+        return 'debler-yarn-' + name.lower().replace('_', '--')
 
 pkgerInfo = YarnPackager

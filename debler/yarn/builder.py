@@ -159,15 +159,17 @@ class YarnBuilder(BaseBuilder):
         yield RuleOverride('clean')
         yield RuleOverride('build')
         yield RuleOverride('test')
+        yield RuleOverride('install')
 
         with tarfile.open(self.tarxz_file, 'r:xz') as t:
             members = t.getmembers()
             for member in members:
-                if member.name.endswith('.un~'):
+                filename = '/'.join(member.name.split('/')[1:])
+                if filename.endswith('~') or filename.startswith('.'):
                     continue
                 yield Install(
                     self.deb_name,
-                    '/'.join(member.name.split('/')[1:]),
+                    filename,
                     'usr/share/node-debler/{name}/{dir}'.format(
                         name=self.pkg_name,
                         dir='/'.join(os.path.dirname(member.name)

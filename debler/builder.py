@@ -30,7 +30,7 @@ RuleOverride = namedtuple('RuleOverride', 'target')
 class BaseBuilder():
     @staticmethod
     def npm2deb(name):
-        return 'debler-node-' + name.replace('_', '--')
+        return 'debler-yarn-' + name.lower().replace('_', '--')
 
     def debian_file(self, arg, *extra_args):
         return os.path.join(self.pkg_dir, 'debian', arg, *extra_args)
