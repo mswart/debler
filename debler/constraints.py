@@ -242,4 +242,26 @@ def dependencies4Constraints(deb_name, pkg, constraints):
                 dep=pkg.deb_name,
                 version=constraints.version))
         return
+    if isinstance(constraints, Operator):
+        ors = []
+        for slot in pkg.slots:
+            lower = constraints.op(slot.min_version,
+                                   Version(str(constraints.version)))
+            upper = constraints.op(slot.max_version,
+                                   Version(str(constraints.version)))
+            if lower is upper is False:  # matches never
+                continue
+            if lower is upper is True:  # matches always
+                ors.append('{dep}-{slot}'.format(
+                    dep=pkg.deb_name,
+                    slot=slot.version))
+            else:
+                ors.append('{dep}-{slot} ({op} {version})'.format(
+                    dep=pkg.deb_name,
+                    slot=slot.version,
+                    op=constraints.char,
+                    version=constraints.version))
+        if ors:
+            yield Dependency(deb_name, ' | '.join(ors))
+        return
     raise ValueError(deb_name, pkg, constraints)

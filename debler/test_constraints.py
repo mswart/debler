@@ -65,3 +65,15 @@ def test_deps_caret2():
     pkg = build_pkg_info('bar', '1.1', '1.2', '1.3', '1.4', '2.0', '2.1')
     assert set(dependencies4Constraints('foo', pkg, parseConstraints('^1.2.3'))) == \
         {Dependency('foo', 'bar-1.2 (>= 1.2.3) | bar-1.3 | bar-1.4')}
+
+
+def test_deps_eq():
+    pkg = build_pkg_info('bar', '1.1')
+    assert set(dependencies4Constraints('foo', pkg, parseConstraints('1.2.3'))) == \
+        {Dependency('foo', 'bar-1.2.3')}
+
+
+def test_deps_gt():
+    pkg = build_pkg_info('bar', '1.1', '1.2', '1.3')
+    assert set(dependencies4Constraints('foo', pkg, parseConstraints('>=1.2.3'))) == \
+        {Dependency('foo', 'bar-1.2 (>= 1.2.3) | bar-1.3')}
