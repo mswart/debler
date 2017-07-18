@@ -53,7 +53,7 @@ class YarnAppInfo(BasePackagerAppInfo):
                    **opts)
 
     def schedule_dep_builds(self):
-        for pkg in self.lock.pkgs.values():
+        for pkg in self.lock.pkgs:
             info = self.pkger.pkg_info(pkg.name, autocreate=True)
             slot = info.slot_for_version(pkg.version, create=True)
             versions = slot.versions()

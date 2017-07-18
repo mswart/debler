@@ -20,7 +20,7 @@ class PkgInfo():
 class YarnLockParser():
     def __init__(self, content):
         start = content.index('# yarn lockfile v1')
-        self.pkgs = {}
+        self.pkgs = []
         pkgs = content[start+18:].strip().split('\n\n')
         for pkg in pkgs:
             self.parse_pkg(pkg)
@@ -53,4 +53,4 @@ class YarnLockParser():
             else:
                 cur = {}
                 extras[line[2:-1].strip()] = cur
-        self.pkgs[name] = PkgInfo(name, constraints, **extras)
+        self.pkgs.append(PkgInfo(name, constraints, **extras))
