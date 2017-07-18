@@ -167,6 +167,8 @@ class YarnBuilder(BaseBuilder):
                 filename = '/'.join(member.name.split('/')[1:])
                 if filename.endswith('~') or filename.startswith('.'):
                     continue
+                if filename.startswith('docs'):
+                    continue
                 yield Install(
                     self.deb_name,
                     filename,
