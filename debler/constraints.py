@@ -39,7 +39,7 @@ class And():
 
 class Operator():
     def __init__(self, version):
-        self.version = version
+        self.version = Version(str(version))
 
     def __repr__(self):
         return '{}{}'.format(self.char, self.version)
@@ -135,7 +135,7 @@ def buildOr(ands):
         return ands[0]
     if not builtins.all(isinstance(_and, And) for _and in ands):
         return Or(ands)
-    ranges = sorted(ands, key=lambda range: (range.ranges[0].char, range.ranges[0].char))
+    ranges = sorted(ands, key=lambda range: (range.ranges[0].char, range.ranges[0].version))
     closedRanges = []
     current = ranges[0]
     closed = False
@@ -197,7 +197,7 @@ def dependencies4Constraints(deb_name, pkg, constraints):
         yield Dependency(deb_name, pkg.deb_name)
         return
     if type(constraints) is Or:
-        raise NotImplementedError()
+        raise NotImplementedError('Cannot generate dependencies for {}: {}'.format(constraints, [s.version for s in pkg.slots]))
     if type(constraints) is And:
         ors = []
         for slot in pkg.slots:
