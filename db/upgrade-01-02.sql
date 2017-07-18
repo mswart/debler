@@ -132,7 +132,7 @@ INSERT INTO slots (pkg_id, version, metadata) SELECT
   FROM gemslots;
 
 
-INSERT INTO versions (slot_id, version, created_at) SELECT
+INSERT INTO versions (slot_id, version, config, created_at) SELECT
   (SELECT id
    FROM slots
    WHERE version = version2str(package_versions.slot)
@@ -142,6 +142,7 @@ INSERT INTO versions (slot_id, version, created_at) SELECT
          AND pkger_id = (SELECT id FROM packager
               WHERE packager.name = split_part(package_versions.name, ':', 1)))),
   version2str(package_versions.version),
+  package_versions.extra,
   MIN(scheduled_at)
   FROM package_versions
   GROUP BY package_versions.name, package_versions.slot, package_versions.version;
