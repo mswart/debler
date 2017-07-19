@@ -1,6 +1,5 @@
 import os.path
 
-from debler import config
 from ..builder import Package, Dependency, \
     Install, Symlink, \
     InstallContent, DebianContent, \
@@ -23,7 +22,7 @@ class BundlerAppIntegrator():
 
     @property
     def rubies(self):
-        for ruby in config.rubies:
+        for ruby in self.pkger.rubies:
             yield self.builder.deb_name + '-ruby' + ruby[:-2], ruby
 
     def generate_control_content(self):
@@ -94,7 +93,7 @@ class BundlerAppIntegrator():
             else:
                 yield Dependency(deb_name, deb_dep)
         yield Dependency(deb_name, ' | '.join([
-            deb_name + '-ruby' + ruby for ruby in config.rubies]))
+            deb_name + '-ruby' + ruby for ruby in self.pkger.rubies]))
 
         for deb, ruby in self.rubies:
             self.load_paths[ruby + '.0'] = (deb, [])

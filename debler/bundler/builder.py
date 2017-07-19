@@ -174,7 +174,7 @@ class GemBuilder(BaseBuilder):
         if 'revision' not in self.build.version_config:
             subprocess.check_call([
                 'wget',
-                '{}/gems/{}-{}.gem'.format(config.rubygems, self.gem_name,
+                '{}/gems/{}-{}.gem'.format(self.pkger.rubygems, self.gem_name,
                                            self.gem_version),
                 '-O', self.src_file])
             return
@@ -234,18 +234,9 @@ class GemBuilder(BaseBuilder):
             yield SourceControl(homepage=self.metadata['homepage'])
         yield BuildDependency('debhelper')
 
-        # yield Package(
-        #     package=self.deb_name,
-        #     architecture='all',
-        #     section='ruby',  # TODO fix this
-        #     description=self.app.description,
-        # )
-        # yield Dependency(self.deb_name, '${shlibs:Depends}')
-        # yield Dependency(self.deb_name, '${misc:Depends}')
-
         exts = self.extension_list()
         if len(exts) > 0:
-            for ruby in config.rubies:
+            for ruby in self.pkger.rubies:
                 yield BuildDependency('ruby{}'.format(ruby))
                 yield BuildDependency('ruby{}-dev'.format(ruby))
 
@@ -370,11 +361,11 @@ class GemBuilder(BaseBuilder):
         yield Dependency(self.deb_name, '${misc:Depends}')
         if len(exts) > 0:
             binary_deps = ['{}-ruby{} (= ${{binary:Version}})'.format(
-                           self.deb_name, ruby) for ruby in config.rubies]
+                           self.deb_name, ruby) for ruby in self.pkger.rubies]
             yield Dependency(self.deb_name, ' | '.join(binary_deps))
 
         if len(exts) > 0:
-            for ruby in config.rubies:
+            for ruby in self.pkger.rubies:
                 name = self.deb_name + '-ruby' + ruby
                 yield Package(
                     name=name,
@@ -466,15 +457,15 @@ Gem::Specification.new do |s|
             rubyopts += ' -I{path}'.format(path=load_path)
         if len(exts) == 1:
             yield RuleAction('build',
-                             ' v'.join(['mkdir'] + list(config.rubies)))
-            for ruby in config.rubies:
+                             ' v'.join(['mkdir'] + list(self.pkger.rubies)))
+            for ruby in self.pkger.rubies:
                 yield RuleAction(
                     'build',
                     'cd v{v} && ruby{v} {rubyopts} ../src/{} {}'.format(
                         exts[0], ext_args, v=ruby, rubyopts=rubyopts))
-            for ruby in config.rubies:
+            for ruby in self.pkger.rubies:
                 yield RuleAction('build', 'make -C v{v}'.format(v=ruby))
-            for ruby in config.rubies:
+            for ruby in self.pkger.rubies:
                 yield RuleAction('build', ' '.join([
                     'dh_install',
                     '-p{package}',
@@ -491,15 +482,15 @@ Gem::Specification.new do |s|
         elif len(exts) > 1:
             yield RuleAction('build', ' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in self.metadata['extensions'] for ruby in config.rubies]))
             for ext in exts:
-                for ruby in config.rubies:
+                for ruby in self.pkger.rubies:
                     yield RuleAction('build', 'cd v{v}/{ext} && ruby{v} {rubyopts}../../src/{} {}'.format(
                         ext, ext_args, ext=ext.replace('/', '_'), v=ruby, rubyopts=rubyopts))
             for ext in exts:
-                for ruby in config.rubies:
+                for ruby in self.pkger.rubies:
                     yield RuleAction('build', 'make -C v{v}/{ext}'.format(
                         ext=ext.replace('/', '_'), v=ruby))
             for ext in exts:
-                for ruby in config.rubies:
+                for ruby in self.pkger.rubies:
                     yield RuleAction('build', ' '.join([
                         'dh_install',
                         '-p{package}',

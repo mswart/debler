@@ -13,6 +13,14 @@ class BundlerPackager(Packager):
         'builder': GemBuilder,
     }
 
+    def __init__(self, *args, rubies,
+                 rubygems: "https://rubygems.org",
+                 rubygems_apikey: None):
+        super().__init__(*args)
+        self.rubies = rubies
+        self.rubygems = rubygems
+        self.rubygems_apikey = rubygems_apikey
+
     def gem_info(self, name, autocreate=False):
         try:
             return self.db.pkg_info(self.id, name, self.name2deb(name))
