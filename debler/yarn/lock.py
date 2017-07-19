@@ -53,4 +53,8 @@ class YarnLockParser():
             else:
                 cur = {}
                 extras[line[2:-1].strip()] = cur
+        if name[0] == '@':  # scoped module
+            # we do not know how to correctly handle them,
+            # so skip them for now
+            return
         self.pkgs.append(PkgInfo(name, constraints, **extras))

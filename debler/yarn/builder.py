@@ -136,6 +136,10 @@ class YarnBuilder(BaseBuilder):
 
         # todo
         for name, constraints in self.metadata.dependencies.items():
+            if name[0] == '@':  # scoped module
+                # we do not know how to correctly handle them,
+                # so skip them for now
+                continue
             yield from dependencies4Constraints(self.deb_name, self.pkger.pkg_info(name),
                                                 parseConstraints(constraints))
         #new_deps, self.symlinks = self.metadata.needed_relations('/usr/share/node-debler/{}/'.format(self.pkg_name))
