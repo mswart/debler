@@ -49,8 +49,11 @@ class YarnBuilder(BaseBuilder):
 
     def parse_metadata(self):
         with tarfile.open(name=self.src_file, mode='r:gz') as t:
-            metadata = t.extractfile('package/package.json').read().decode('utf-8')
-            self.metadata = YarnAppInfo(self.pkger, None, lock=None, dir=None, **json.loads(metadata))
+            packagejson = next(m.name for m in t.getmembers()
+                               if m.name.endswith('/package.json'))
+            metadata = t.extractfile(packagejson).read().decode('utf-8')
+            self.metadata = YarnAppInfo(self.pkger, None, lock=None, dir=None,
+                                        **json.loads(metadata))
             print(self.metadata.dependencies)
 
     def create_dirs(self):
