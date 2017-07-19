@@ -4,6 +4,7 @@ from ..pkger import Packager
 from .appinfo import BundlerAppInfo
 from .appintegrator import BundlerAppIntegrator
 from .builder import GemBuilder
+from .webhook import RubygemsWebHook
 
 
 class BundlerPackager(Packager):
@@ -11,6 +12,7 @@ class BundlerPackager(Packager):
         'appInfo': BundlerAppInfo.parse,
         'appIntegrator': BundlerAppIntegrator,
         'builder': GemBuilder,
+        'webhook': RubygemsWebHook,
     }
 
     def __init__(self, *args, rubies,

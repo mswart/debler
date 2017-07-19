@@ -55,7 +55,8 @@ CREATE EXTENSION IF NOT EXISTS debversion;
 CREATE TABLE packager (
   id SERIAL PRIMARY KEY,
   name VARCHAR(60) NOT NULL,
-  config JSONB NOT NULL default '{}'
+  config JSONB NOT NULL default '{}',
+  enabled boolean NOT NULL default false
 );
 
 CREATE TABLE packages (

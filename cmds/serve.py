@@ -1,13 +1,9 @@
 import functools
-import hashlib
 import http.server
-import json
 import logging
-import subprocess
 
 
 import debler.db
-from debler import config
 
 logging.basicConfig(
     level=logging.DEBUG,
@@ -19,9 +15,9 @@ log = logging.getLogger(__name__)
 class DeblerHandler(http.server.BaseHTTPRequestHandler):
     server_version = 'debler/0.1'
 
-    def __init__(self, args, db, *pargs, **kwargs):
+    def __init__(self, args, hooks, *pargs, **kwargs):
         self.args = args
-        self.db = db
+        self.hooks = hooks
         super().__init__(*pargs, **kwargs)
 
     def send_data(self, data, content_type='text/plain', response_code=200):
@@ -39,75 +35,16 @@ class DeblerHandler(http.server.BaseHTTPRequestHandler):
 
     def do_POST(self):
         """ Handles POST request (webhooks). """
-        if self.path != '/debler/updatetrigger/gem':
+        if not self.path.startswith('/debler/updatetrigger/'):
             self.send_error(404)
             return
 
-        if 'Authorization' not in self.headers:
-            self.send_error(403)
+        name = self.path[22:]
+        if name not in self.hooks:
+            self.send_error(404)
             return
-        if 'Content-Type' not in self.headers \
-                or self.headers['Content-Type'] != 'application/json':
-            self.send_error(415)
-            return
-        if 'Content-Length' not in self.headers:
-            self.send_error(411)
-            return
-        content_length = int(self.headers['Content-Length'])
-        if content_length > 1024*1024:  # 1M
-            self.send_error(413)
-            return
-        try:
-            encoded_data = self.rfile.read(content_length)
-            data = json.loads(encoded_data.decode('utf-8'))
-        except Exception as e:
-            print(e)
-            self.send_error(400)
-            return
-        if 'name' not in data or 'version' not in data:
-            self.send_error(400)
-            return
-        name = data['name']
-        version = data['version']
-        kwargs = {'name': name, 'gem': name, 'version': version, 'slot': None}
-        if config.rubygems_apikey:
-            hashdata = name + version + config.rubygems_apikey
-            auth = hashlib.sha256(hashdata.encode('utf-8')).hexdigest()
-            if auth != self.headers['Authorization']:
-                self.send_error(403)
-                return
-        self.send_data(b'OK')
-        log.debug('Webhook triggered for %(gem)s in %(version)s', kwargs)
-        info = self.db.gem_info(name, autocreate=False)
-        if not info:
-            log.debug('Skip release %(version)s of %(gem)s we do not use it',
-                      kwargs)
-            return
-        new_slot = tuple(int(v) for v in version.split('.')[:info.level])
-        kwargs['slot'] = '.'.join(str(s) for s in new_slot)
-        if new_slot in info.slots:
-            new_version = list(int(v) for v in version.split('.'))
-            versions = self.db.gem_slot_versions(name, new_slot)
-            if new_version in versions:
-                log.warning('%(gem)s rerelease in version %(version)s',
-                            kwargs)
-                return
-            self.db.create_gem_version(
-                name, list(new_slot),
-                version=new_version, revision=1,
-                changelog='New upstream release',
-                distribution=config.distribution)
-            log.info('%(gem)s scheduled to build %(version)s in %(slot)s',
-                     kwargs)
-            if self.args.hook:
-                args = [self.args.hook]
-                for arg in self.args.hook_arg:
-                    args.append(arg.format(**kwargs))
-                log.debug('exec %s', ' '.join(args))
-                subprocess.run(args, check=True, timeout=60)
-        else:
-            log.info('%(gem)s\'s release %(version)s in unknown slot %(slot)s',
-                     kwargs)
+
+        self.hooks[name].run(self)
 
     def log_message(self, format, *args):
         pass
@@ -115,7 +52,15 @@ class DeblerHandler(http.server.BaseHTTPRequestHandler):
 
 def run(args):
     db = debler.db.Database()
-    connectedHandler = functools.partial(DeblerHandler, args, db)
+    pkgers = db.get_pkgers()
+    hooks = {}
+    for pkger in pkgers.values():
+        if not hasattr(pkger, 'webhook'):
+            continue
+        webhook = pkger.webhook(args.hook, args.hook_arg)
+        for name in webhook.hook_names:
+            hooks[name] = webhook
+    connectedHandler = functools.partial(DeblerHandler, args, hooks)
 
     server = http.server.HTTPServer((args.host, args.port), connectedHandler)
     server.allow_reuse_address = True

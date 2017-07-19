@@ -117,6 +117,15 @@ class Database():
         impl = import_module(result[1].pop('module'))
         return getattr(impl, 'pkgerInfo')(self, result[0], **result[1])
 
+    def get_pkgers(self):
+        c = self.conn.cursor()
+        c.execute('SELECT id, name, config FROM packager WHERE enabled = true')
+        pkgers = {}
+        for id, name, cfg in c:
+            impl = import_module(cfg.pop('module'))
+            pkgers[name] = getattr(impl, 'pkgerInfo')(self, id, **cfg)
+        return pkgers
+
     def register_pkg(self, pkger_id, name, config):
         c = self.conn.cursor()
         c.execute("""INSERT INTO packages (pkger_id, name, config)
