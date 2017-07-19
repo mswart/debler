@@ -168,6 +168,8 @@ class YarnBuilder(BaseBuilder):
             members = t.getmembers()
             for member in members:
                 filename = '/'.join(member.name.split('/')[1:])
+                if not filename:
+                    continue
                 if filename.endswith('~') or filename.startswith('.'):
                     continue
                 if filename.startswith('docs'):
