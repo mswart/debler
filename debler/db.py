@@ -214,9 +214,10 @@ class Database():
         values = []
         if ids is not None:
             sql += ' WHERE rev.id = ANY(%s)'
-            sql += ' ORDER BY array_position(%s, rev.id)'
             values.append(ids)
-            values.append(ids)
+            if len(ids) > 1:
+                sql += ' ORDER BY array_position(%s, rev.id)'
+                values.append(ids)
         elif result is None:
             sql += ' WHERE rev.result IS NULL'
         else:
