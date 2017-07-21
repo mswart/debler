@@ -108,7 +108,7 @@ CREATE TABLE revisions (
 );
 
 
-INSERT INTO packager (name) SELECT DISTINCT split_part(name, ':', 1) from packages;
+INSERT INTO packager (name) SELECT DISTINCT split_part(name, ':', 1) from gemslots;
 
 
 INSERT INTO packages (pkger_id, name, config) SELECT
@@ -146,7 +146,7 @@ INSERT INTO versions (slot_id, version, config, created_at) SELECT
   package_versions.extra,
   MIN(scheduled_at)
   FROM package_versions
-  GROUP BY package_versions.name, package_versions.slot, package_versions.version;
+  GROUP BY package_versions.name, package_versions.slot, package_versions.version, package_versions.extra;
 
 
 INSERT INTO distributions (name) SELECT DISTINCT distribution FROM package_versions;
