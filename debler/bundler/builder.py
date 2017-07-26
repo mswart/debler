@@ -4,7 +4,6 @@ import gzip
 import yaml
 from struct import pack, unpack
 import subprocess
-import re
 from shutil import move
 from glob import glob
 
@@ -15,6 +14,8 @@ from debler.builder import BaseBuilder, \
     SourceControl, Package, \
     BuildDependency, Dependency, Provide, \
     Install, InstallContent, RuleAction
+from .constraints import parseConstraints
+from ..constraints import dependencies4Constraints
 
 
 def construct_ruby_object(loader, suffix, node):
@@ -103,7 +104,6 @@ class GemInfo():
 
 
 class GemBuilder(BaseBuilder):
-
     @staticmethod
     def gemname2deb(name):
         return 'debler-rubygem-' + name.replace('_', '--')
@@ -260,7 +260,8 @@ class GemBuilder(BaseBuilder):
             yield Provide(self.deb_name, self.gemname2deb(self.gem_name))
             for l in range(1, info.level):
                 yield Provide(self.deb_name,
-                    self.gemname2deb(self.gem_name + '-' + str(self.gem_version.limit(l))))
+                              self.gemname2deb(self.gem_name + '-' +
+                                               str(self.gem_version.limit(l))))
         if 'revision' in self.build.version_config:
             yield Provide(self.deb_name, self.gemname2deb(self.gem_name) +
                           '-' + self.build.version_config['revision'])
@@ -276,85 +277,18 @@ class GemBuilder(BaseBuilder):
             if depinfo.get('buildgem', False):
                 # gem is only used during gem building,
                 # no need for runtime dependency
-                slot = list(depinfo.slots.keys())[-1]
-                slot_s = '.'.join(str(s) for s in slot)
-                yield BuildDependency(req + '-' + slot_s)
-                for path in depinfo.slots[slot].get('require_paths', []):
+                slot = depinfo.slots[-1]
+                yield BuildDependency(req + '-' + str(slot.version))
+                for path in slot.get('require_paths', []):
                     self.ext_load_paths.append(
                         '/usr/share/rubygems-debler/{name}-{slot}/{}/'.format(
-                            path, name=dep['name'], slot=slot_s))
+                            path, name=dep['name'], slot=slot.version))
                 # TODO: implement version contraints
                 continue
-            versioned_deps = False
-            for version in dep['version_requirements']['requirements']:
-                if version[0] == '>=' and version[1]['version'] == '0':
-                    continue
-                if not depinfo.slots:
-                    continue
-                if version[0] != '=' and '.rc' in version[1]['version']:
-                    version[1]['version'] = version[1]['version'][:version[1]['version'].find('.rc')]
-                if version[0] == '~>':
-                    versioned_deps = True
-                    min_version = version[1]['version']
-                    up = min_version.split('.')
-                    fixed_components = len(up) - 1
-                    if fixed_components > depinfo.level:
-                        # we stay within one slot
-                        # e.g. ~> 1.5 and slots = (0, 1, 2)
-                        req += '-' + '.'.join(up[:depinfo.level])
-                        yield Dependency(self.deb_name, '{} (>= {})'.format(req, min_version))
-                        up[-1] = '0'
-                        up[-2] = str(int(up[-2]) + 1)
-                        yield Dependency(self.deb_name, '{} (<< {})'.format(req, '.'.join(up)))
-                    elif fixed_components == depinfo.level:
-                        # we are pinned to a specific slot
-                        # e.g. ~> 1.5.1 and slots 1.5, 1.6
-                        yield Dependency(self.deb_name, '{}-{}'.format(req, '.'.join(up[:fixed_components])))
-                    elif fixed_components < depinfo.level:
-                        # multiple slots fulfil the requirements
-                        # e.g. ~> 1.0, and slots 1.5, 1.6, 1.7, 1.8
-                        # depend on any of same (but prefer newer ones)
-                        possible_deps = []
-                        required_prefix = tuple(int(v) for v in up[:fixed_components])
-                        for slot in reversed(depinfo.slots):
-                            if required_prefix != slot[:fixed_components]:
-                                continue
-                            possible_deps.append('{}-{}'.format(req, '.'.join(str(s) for s in slot)))
-                        yield Dependency(self.deb_name, ' | '.join(possible_deps))
-                elif version[0] == '!=':
-                    # we need to exclude all debian revision of this version
-                    # meaning << version or >> version +1
-                    # 1. searching matching slot:
-                    for slot in reversed(depinfo.slots):
-                        if slot != tuple(int(v) for v in version[1]['version'].split('.')[:len(slot)]):
-                            continue
-                        parts = version[1]['version'].split('.')
-                        parts[-1] = str(int(parts[-1]) + 1)
-                        yield Dependency(self.deb_name, '{pkg} (<< {max_ver}) | {pkg} (>> {min_ver})'.format(
-                            pkg='{}-{}'.format(req, '.'.join(str(s) for s in slot)),
-                            max_ver=version[1]['version'],
-                            min_ver='.'.join(parts)
-                        ))
-                        break
-                else:
-                    if version[0] in ['<', '<=']:
-                        up = version[1]['version'].split('.')
-                        up[-1] = str(int(up[-1]) + 1)
-                        v = '.'.join(up)
-                    else:
-                        v = re.sub('\.([^0-9])', '.~\\1', version[1]['version'])
-                    versioned_deps = True
-                    tmp = []
-                    # todo simplify
-                    for slot in depinfo.slots:
-                        if str(slot.version):
-                            slot = '-' + str(slot.version)
-                        else:
-                            slot = ''
-                        tmp.append('{} ({} {})'.format(req + slot, {'>': '>=', '=': '>=', '<': '<='}.get(version[0], version[0]), v))
-                    yield Dependency(self.deb_name, ' | '.join(tmp))
-            if not versioned_deps:
-                yield Dependency(self.deb_name, req)
+            requirements = dep['version_requirements']['requirements']
+            constraints = parseConstraints(requirements)
+            yield from dependencies4Constraints(self.deb_name, depinfo,
+                                                constraints)
         for dep in info.lookup('rundeps', default=[]):
             yield Dependency(self.deb_name, dep)
         yield Dependency(self.deb_name, '${shlibs:Depends}')
