@@ -200,7 +200,7 @@ def dependencies4Constraints(deb_name, pkg, constraints):
         raise NotImplementedError('Cannot generate dependencies for {}: {}'.format(constraints, [s.version for s in pkg.slots]))
     if type(constraints) is And:
         ors = []
-        for slot in pkg.slots:
+        for slot in reversed(pkg.slots):
             valid_constraints = []
             for op in constraints.ranges:
                 lower = op.op(slot.min_version, Version(str(op.version)))
@@ -244,7 +244,7 @@ def dependencies4Constraints(deb_name, pkg, constraints):
         return
     if isinstance(constraints, Operator):
         ors = []
-        for slot in pkg.slots:
+        for slot in reversed(pkg.slots):
             lower = constraints.op(slot.min_version,
                                    Version(str(constraints.version)))
             upper = constraints.op(slot.max_version,
