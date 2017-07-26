@@ -81,7 +81,8 @@ Licence: See LICENCE file
                 for key, value in item.items():
                     key = '-'.join([k.capitalize() for k in key.split('_')])
                     if key == 'Description':
-                        value = value.replace('\n\n', '\n.\n') \
+                        value = value.strip() \
+                                     .replace('\n\n', '\n.\n') \
                                      .replace('\n', '\n ')
                     dsc[key] = value
             elif isinstance(item, BuildDependency):
@@ -91,7 +92,8 @@ Licence: See LICENCE file
                 for key, value in item._asdict().items():
                     key = '-'.join([k.capitalize() for k in key.split('_')])
                     if key == 'Description':
-                        value = value.replace('\n\n', '\n.\n') \
+                        value = value.strip() \
+                                     .replace('\n\n', '\n.\n') \
                                      .replace('\n', '\n ')
                     control[key] = value
                 packages[item.package] = (control, [], [])
