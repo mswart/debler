@@ -251,9 +251,9 @@ exit 0
                         bundler_content += '    Kernel.require "{}"\n' \
                             .format(require)
                     else:
-                        bundler_content += '    Kernel.require "{}"'
-                        ' unless (groups & ["{}"]).empty?\n'.format(
-                            require, '", "'.join(gem.envs))
+                        bundler_content += '    Kernel.require "{}"' \
+                            ' unless (groups & ["{}"]).empty?\n'.format(
+                                require, '", "'.join(gem.envs))
             bundler_content += '''  end
 
   def self.setup(*args)
