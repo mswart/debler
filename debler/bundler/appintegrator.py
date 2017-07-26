@@ -31,15 +31,6 @@ class BundlerAppIntegrator():
             if not gem.version:  # included by path
                 assert gem.path is not None, 'gem "{!s}" does not have any ' \
                     'version, but no path: {!r}!'.format(gem.name, gem)
-                self.load_paths['all'][1].append(
-                    '/usr/share/{name}/{path}/{}'.format('lib',
-                                                         name=self.app.name,
-                                                         path=gem.path))
-                yield Install(deb_name, gem.path,
-                              '/usr/share/{name}/{path}'.format(
-                                  'lib',
-                                  name=self.app.name,
-                                  path=os.path.dirname(gem.path)))
                 continue
             info = self.pkger.gem_info(name)
             if info.get('buildgem', False):
@@ -115,6 +106,17 @@ class BundlerAppIntegrator():
             yield Dependency(deb, '${misc:Depends}')
 
     def generate_rules_content(self):
+        for name, gem in self.app.gems.items():
+            if not gem.version:  # included by path
+                self.load_paths['all'][1].append(
+                    '/usr/share/{name}/{path}/{}'.format('lib',
+                                                         name=self.app.name,
+                                                         path=gem.path))
+                yield Install(self.builder.deb_name, gem.path,
+                              '/usr/share/{name}/{path}'.format(
+                                  'lib',
+                                  name=self.app.name,
+                                  path=os.path.dirname(gem.path)))
         for version in self.load_paths:
             if version == 'all':
                 continue
