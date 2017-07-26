@@ -23,7 +23,7 @@ class BundlerAppIntegrator():
     @property
     def rubies(self):
         for ruby in self.pkger.rubies:
-            yield self.builder.deb_name + '-ruby' + ruby[:-2], ruby
+            yield self.builder.deb_name + '-ruby' + ruby, ruby
 
     def generate_control_content(self):
         deb_name = self.builder.deb_name
