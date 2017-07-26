@@ -316,7 +316,7 @@ class GemBuilder(BaseBuilder):
                         # depend on any of same (but prefer newer ones)
                         possible_deps = []
                         required_prefix = tuple(int(v) for v in up[:fixed_components])
-                        for slot in reversed(sorted(depinfo.slots)):
+                        for slot in reversed(depinfo.slots):
                             if required_prefix != slot[:fixed_components]:
                                 continue
                             possible_deps.append('{}-{}'.format(req, '.'.join(str(s) for s in slot)))
@@ -325,7 +325,7 @@ class GemBuilder(BaseBuilder):
                     # we need to exclude all debian revision of this version
                     # meaning << version or >> version +1
                     # 1. searching matching slot:
-                    for slot in reversed(sorted(depinfo.slots)):
+                    for slot in reversed(depinfo.slots):
                         if slot != tuple(int(v) for v in version[1]['version'].split('.')[:len(slot)]):
                             continue
                         parts = version[1]['version'].split('.')
