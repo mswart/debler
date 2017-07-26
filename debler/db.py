@@ -135,9 +135,14 @@ class Database():
     def pkg_info(self, pkger_id, name, deb_name,
                  klass=PkgInfo, slotklass=SlotInfo):
         c = self.conn.cursor()
-        c.execute('SELECT id, config FROM packages '
-                  'WHERE pkger_id = %s AND name = %s',
-                  (pkger_id, name))
+        if pkger_id is not None:
+            c.execute('SELECT id, config FROM packages '
+                      'WHERE pkger_id = %s AND name = %s',
+                      (pkger_id, name))
+        else:
+            c.execute('SELECT id, config FROM packages '
+                      'WHERE name = %s',
+                      (name, ))
         result = c.fetchone()
         if not result:
             raise ValueError('Pkg "{}" unknown in pkger {}'.format(
@@ -192,6 +197,24 @@ class Database():
             (version_id, distribution_id, version, scheduled_at, changelog)
                      VALUES (%s, %s, %s, %s, %s);""",
                   (result[0], distribution_id, version + '-' + str(revision),
+                   now, changelog))
+        self.conn.commit()
+
+    def schedule_rebuild(self, build_id, changelog):
+        now = datetime.now(tz=tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z')
+        c = self.conn.cursor()
+        c.execute("""SELECT version_id, distribution_id, version
+                     FROM revisions
+                     WHERE id = %s""",
+                  (build_id,))
+        version_id, distribution_id, version = c.fetchone()
+        version, revision = version.rsplit('-', 1)
+        revision = str(int(revision) + 1)
+        version = version + '-' + revision
+        c.execute("""INSERT INTO revisions
+            (version_id, distribution_id, version, scheduled_at, changelog)
+                     VALUES (%s, %s, %s, %s, %s);""",
+                  (version_id, distribution_id, version,
                    now, changelog))
         self.conn.commit()
 
