@@ -253,7 +253,7 @@ class GemBuilder(BaseBuilder):
             architecture='all',
             section='ruby',
             description=self.metadata['summary'] + '\n' +
-            self.metadata['description'],
+            (self.metadata.get('description', '') or ''),
         )
 
         if info.level > 0:
