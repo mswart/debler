@@ -94,9 +94,25 @@ class VersionInfo():
         self.metadata = metadata
         self.populated = populated
 
+    def revisions(self):
+        return self.db.get_revisions(self)
+
     def __repr__(self):
         return 'VersionInfo({!r}, {}, {!r}, {!r}, {!r})'.format(
             self.slot, self.id, self.version, self.config, self.metadata)
+
+
+class RevisionsInfo():
+    def __init__(self, id, version, distribution, scheduled_at,
+                 builder, built_at, changelog, result):
+        self.id = id
+        self.version = Version(version)
+        self.distribution = distribution
+        self.scheduled_at = scheduled_at
+        self.builder = builder
+        self.built_at = built_at
+        self.changelog = changelog
+        self.result = result
 
 
 class Database():
@@ -178,6 +194,23 @@ class Database():
         for row in c:
             versions.append(VersionInfo(self, slot, *row))
         return versions
+
+    def get_revisions(self, version):
+        c = self.conn.cursor()
+        c.execute('''SELECT revisions.id, version,
+                            distributions.name, scheduled_at,
+                            builder, built_at,
+                            changelog, result
+                     FROM revisions
+                     INNER JOIN distributions
+                        ON revisions.distribution_id = distributions.id
+                     WHERE version_id = %s
+                     ORDER BY version ASC''',
+                  (version.id, ))
+        reversions = []
+        for row in c:
+            reversions.append(RevisionsInfo(*row))
+        return reversions
 
     def schedule_build(self, slot, *, version, revision,
                        format=None, changelog, distribution,
