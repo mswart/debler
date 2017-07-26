@@ -368,7 +368,7 @@ class GemBuilder(BaseBuilder):
             for ruby in self.pkger.rubies:
                 name = self.deb_name + '-ruby' + ruby
                 yield Package(
-                    name=name,
+                    name,
                     architecture='any',
                     section='ruby',
                     description=self.metadata['summary'] +
