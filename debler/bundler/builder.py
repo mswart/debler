@@ -243,7 +243,6 @@ class GemBuilder(BaseBuilder):
         info = self.pkger.gem_info(self.gem_name)
         if info.native is None:  # auto-detect on first build
             info.native = bool(len(exts) > 0)
-            self.db.set_gem_native(self.gem_name, info.native)
         assert info.native is (len(exts) > 0), 'Native flag value is wrong!'
         for builddep in info.get('builddeps', []):
             yield BuildDependency(builddep)

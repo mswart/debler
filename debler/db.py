@@ -30,8 +30,17 @@ class PkgInfo():
     def get(self, name, default=None):
         return self.lookup(name, default=default)
 
+    def set(self, name, value, context='default'):
+        self.opts.setdefault(context, {})[name] = value
+        self.db.set_pkg_config(self.id, self.opts)
+
     def __getattr__(self, name):
         return self.lookup(name, default=None)
+
+    def __setattr__(self, name, value):
+        if name in ('db', 'id', 'name', 'deb_name', 'opts', 'slots'):
+            return object.__setattr__(self, name, value)
+        return self.set(name, value, context='default')
 
     def slot_for_version(self, version, create=False):
         parts = str(version).split('.')
@@ -146,6 +155,12 @@ class Database():
         c = self.conn.cursor()
         c.execute("""INSERT INTO packages (pkger_id, name, config)
              VALUES (%s, %s, %s);""", (pkger_id, name, json.dumps(config)))
+        self.conn.commit()
+
+    def set_pkg_config(self, pkg_id, config):
+        c = self.conn.cursor()
+        c.execute('UPDATE packages SET config = %s WHERE id = %s',
+                  (json.dumps(config), pkg_id))
         self.conn.commit()
 
     def pkg_info(self, pkger_id, name, deb_name,
