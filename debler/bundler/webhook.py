@@ -16,7 +16,7 @@ class RubygemsWebHook():
         self.hook = hook
         self.hook_args = hook_args
 
-    def run(self, name, request):
+    def run(self, request):
         if 'Authorization' not in request.headers:
             request.send_error(403)
             return
@@ -52,8 +52,9 @@ class RubygemsWebHook():
                 return
         request.send_data(b'OK')
         log.debug('Webhook triggered for %(gem)s in %(version)s', kwargs)
-        info = self.pkger.gem_info(name, autocreate=False)
-        if not info:
+        try:
+            info = self.pkger.gem_info(name, autocreate=False)
+        except ValueError:
             log.debug('Skip release %(version)s of %(gem)s we do not use it',
                       kwargs)
             return
@@ -64,7 +65,7 @@ class RubygemsWebHook():
                      kwargs)
             return
         kwargs['slot'] = slot.version
-        versions = [v.version for v in slot.versions]
+        versions = [v.version for v in slot.versions()]
         if version in versions:
             log.warning('%(gem)s rerelease in version %(version)s',
                         kwargs)

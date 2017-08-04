@@ -1,6 +1,8 @@
 import functools
 import http.server
 import logging
+import sys
+import traceback
 
 
 import debler.db
@@ -44,7 +46,11 @@ class DeblerHandler(http.server.BaseHTTPRequestHandler):
             self.send_error(404)
             return
 
-        self.hooks[name].run(self)
+        try:
+            self.hooks[name].run(self)
+        except Exception:
+            log.exception('Could not run hook')
+            self.send_error(500)
 
     def log_message(self, format, *args):
         pass
