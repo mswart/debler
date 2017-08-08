@@ -414,7 +414,7 @@ Gem::Specification.new do |s|
                     package=self.deb_name + '-ruby' + ruby))
 
         elif len(exts) > 1:
-            yield RuleAction('build', ' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in self.metadata['extensions'] for ruby in config.rubies]))
+            yield RuleAction('build', ' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in self.metadata['extensions'] for ruby in self.pkger.rubies]))
             for ext in exts:
                 for ruby in self.pkger.rubies:
                     yield RuleAction('build', 'cd v{v}/{ext} && ruby{v} {rubyopts}../../src/{} {}'.format(
