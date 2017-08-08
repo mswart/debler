@@ -259,8 +259,9 @@ class GemBuilder(BaseBuilder):
             yield Provide(self.deb_name, self.gemname2deb(self.gem_name))
             for l in range(1, info.level):
                 yield Provide(self.deb_name,
-                              self.gemname2deb(self.gem_name + '-' +
-                                               str(self.gem_version.limit(l))))
+                              self.gemname2deb(
+                                self.gem_name + '-' +
+                                '.'.join(self.gem_version.split('.')[:l])))
         if 'revision' in self.build.version_config:
             yield Provide(self.deb_name, self.gemname2deb(self.gem_name) +
                           '-' + self.build.version_config['revision'])
