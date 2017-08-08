@@ -62,6 +62,12 @@ class PkgInfo():
         return 'PkgInfo({}, {}, {!r}, {!r})'.format(
             self.id, self.name, self.opts, self.slots)
 
+    def rebuild(self, changelog):
+        for slot in self.slots:
+            newest_version = slot.versions()[-1]
+            lastest_build = newest_version.revisions()[-1]
+            self.db.schedule_rebuild(lastest_build.id, changelog)
+
 
 class SlotInfo():
     def __init__(self, db, pkg, id, version, config, metadata):
