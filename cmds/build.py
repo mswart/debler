@@ -36,22 +36,26 @@ def run(args):
         task = '{}: {}\'s {} in version {}:{} ({})'.format(build_id, *data)
         header(task)
         try:
-            db.claim_build(build_id)
+            if not args.incognito:
+                db.claim_build(build_id)
             with TemporaryDirectory() as d:
                 builder = db.get_pkger(data[0]).builder(d, build_id)
                 builder.generate()
                 builder.run()
-            db.update_build(build_id, result='finished')
+            if not args.incognito:
+                db.update_build(build_id, result='finished')
             header(task, color=32)
             successful += 1
         except BuildFailError:
-            db.update_build(build_id, result='failed')
+            if not args.incognito:
+                db.update_build(build_id, result='failed')
             failed += 1
             header(task, color=31)
             if args.fail_fast:
                 break
         except Exception:
-            db.update_build(build_id, result='failed')
+            if not args.incognito:
+                db.update_build(build_id, result='failed')
             failed += 1
             traceback.print_exc()
             header(task, color=31)
@@ -78,6 +82,8 @@ def register(subparsers):
     parser.add_argument('--limit', '-L', type=int, default=None,
                         help='Build at most n packages',
                         metavar='n')
+    parser.add_argument('--incognito', '-I', action='store_true',
+                        help='private build, do not record any changes')
     parser.add_argument('--print-builds', '-P', action='store_true')
     parser.add_argument('builds', nargs='*', metavar='BUILDID',
                         type=int,
