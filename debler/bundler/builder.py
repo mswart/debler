@@ -400,7 +400,7 @@ Gem::Specification.new do |s|
             for ruby in self.pkger.rubies:
                 yield RuleAction('build', 'make -C v{v}'.format(v=ruby))
             for ruby in self.pkger.rubies:
-                yield RuleAction('build', ' '.join([
+                yield RuleAction('install', ' '.join([
                     'dh_install',
                     '-p{package}',
                     'v{v}/*.so',
@@ -425,7 +425,7 @@ Gem::Specification.new do |s|
                         ext=ext.replace('/', '_'), v=ruby))
             for ext in exts:
                 for ruby in self.pkger.rubies:
-                    yield RuleAction('build', ' '.join([
+                    yield RuleAction('install', ' '.join([
                         'dh_install',
                         '-p{package}',
                         'v{v}/{ext}/*.so',
