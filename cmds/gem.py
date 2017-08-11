@@ -32,6 +32,10 @@ def run(args):
             message = 'rebuild to add new runtime dependencies: {}'.format(
                 ', '.join(args.run_dep))
             info.rundeps = info.get('rundeps', default=[]) + args.run_dep
+        elif args.build_dep:
+            message = 'rebuild with needed dependencies: {}'.format(
+                ', '.join(args.build_dep))
+            info.builddeps = info.get('builddeps', default=[]) + args.build_dep
         elif args.native is True:
             message = 'rebuild as native gem'
             gem.native = True
@@ -51,6 +55,8 @@ def register(subparsers):
                        help='set the so subdir + schedule rebuild of this gem')
     group.add_argument('--run-dep', action='append', default=[],
                        help='register a new runtime dependency')
+    group.add_argument('--build-dep', action='append', default=[],
+                       help='register a new build dependency')
     group.add_argument('--native', dest='native', action='store_true')
     group.add_argument('--no-native', dest='native', action='store_false')
     group.add_argument('--schedule', action='store_true',
