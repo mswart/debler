@@ -1,5 +1,3 @@
-import json
-
 from ..pkger import Packager
 from .appinfo import BundlerAppInfo
 from .appintegrator import BundlerAppIntegrator
@@ -38,6 +36,6 @@ class BundlerPackager(Packager):
             return self.db.pkg_info(self.id, name, self.name2deb(name))
 
     def name2deb(self, name):
-        return 'debler-rubygem-' + name.replace('_', '--')
+        return 'debler-rubygem-' + name.lower().replace('_', '--')
 
 pkgerInfo = BundlerPackager

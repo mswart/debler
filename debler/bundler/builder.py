@@ -106,7 +106,7 @@ class GemInfo():
 class GemBuilder(BaseBuilder):
     @staticmethod
     def gemname2deb(name):
-        return 'debler-rubygem-' + name.replace('_', '--')
+        return 'debler-rubygem-' + name.lower().replace('_', '--')
 
     def __init__(self, pkger, tmp_dir, build_id):
         self.pkger = pkger

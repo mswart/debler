@@ -18,7 +18,7 @@ class BundlerAppIntegrator():
 
     @staticmethod
     def gemnam2deb(name):
-        return 'debler-rubygem-' + name.replace('_', '--')
+        return 'debler-rubygem-' + name.lower().replace('_', '--')
 
     @property
     def rubies(self):
