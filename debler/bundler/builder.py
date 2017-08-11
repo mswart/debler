@@ -357,7 +357,7 @@ Gem::Specification.new do |s|
                       if type(self.metadata['email']) is list
                       else self.metadata['email'],
                 homepage=self.metadata['homepage'],  # TODO: might be None!
-                licenses='", "'.join(self.metadata['licenses']),
+                licenses='", "'.join(self.metadata.get('licenses', [])),
                 summary=self.metadata.get('summary', '').replace('"', '\\"'))
 
         for dep in self.metadata['dependencies']:
