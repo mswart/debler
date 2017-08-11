@@ -1,0 +1,3 @@
+source 'https://rubygems.org'
+
+gem 'globalize', '~> 5.0', :git => "https://github.com/cwillems/globalize.git", :branch => "add_uuid_support"

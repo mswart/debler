@@ -1,5 +1,6 @@
 import lepl
 import os
+from string import ascii_letters, digits
 
 from .builder import GemVersion
 
@@ -98,11 +99,11 @@ class VariableAccess():
         self.name = name
 
 
-from string import ascii_letters, digits
-
 maybespace = lepl.Drop(lepl.Optional(lepl.Space()))
 
-string = (lepl.Drop('\'') & lepl.Star(lepl.AnyBut('\'')) & lepl.Drop('\'')) > build_str
+singlestring = (lepl.Drop('\'') & lepl.Star(lepl.AnyBut('\'')) & lepl.Drop('\'')) > build_str
+douplestring = (lepl.Drop('"') & lepl.Star(lepl.AnyBut('"')) & lepl.Drop('"')) > build_str
+string = singlestring | douplestring
 symbol = lepl.Drop(':') & lepl.Star(lepl.AnyBut('\':\t\n ')) > build_str
 identifier = lepl.Any(ascii_letters + '_') & lepl.Star(lepl.Any(ascii_letters + '_' + digits)) & lepl.Optional(lepl.Any('?!')) > build_str
 variable_read = identifier > expand(VariableAccess)
@@ -131,7 +132,7 @@ conditional_expr = simple_expr & maybespace & lepl.Drop('?') & maybespace & simp
 expr += conditional_expr | simple_expr
 
 keywoard_value = simple_expr
-keyword_name = lepl.Star(lepl.AnyBut(':\t ')) > build_str
+keyword_name = lepl.Star(lepl.AnyBut(':\t=> ')) > build_str
 keyword_newstyle = keyword_name & lepl.Drop(':') & ~spaces & keywoard_value > tuple
 keyword_oldstyle = lepl.Drop(':') & keyword_name & ~spaces & lepl.Drop('=>') & ~spaces & keywoard_value > tuple
 keyword = keyword_oldstyle | keyword_newstyle
@@ -141,7 +142,7 @@ keywords = lepl.Star(~lepl.Drop(',') & ~breakablespaces & keyword) > dict
 gem = lepl.Drop('gem') & ~lepl.Space() & string
 # optional version constraints
 gem_constraint_value = variable_read | string
-gem_constraints = lepl.Star(~lepl.Star(lepl.Space()) & ~lepl.Drop(',') & ~lepl.Star(lepl.Space()) & ~lepl.Lookahead(keyword) & gem_constraint_value) > tuple
+gem_constraints = lepl.Star(~spaces & ~lepl.Drop(',') & ~spaces & ~lepl.Lookahead(keyword) & gem_constraint_value) > tuple
 gem &= gem_constraints
 # optional keywords
 gem &= keywords
