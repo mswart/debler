@@ -264,11 +264,13 @@ class Database():
     def schedule_rebuild(self, build_id, changelog):
         now = datetime.now(tz=tzlocal()).strftime('%Y-%m-%d %H:%M:%S %z')
         c = self.conn.cursor()
-        c.execute("""SELECT version_id, distribution_id, version
+        c.execute("""SELECT id, version_id, distribution_id, version, result
                      FROM revisions
                      WHERE id = %s""",
                   (build_id,))
-        version_id, distribution_id, version = c.fetchone()
+        build_id, version_id, distribution_id, version, result = c.fetchone()
+        if result == 'failed':
+            self.update_build(build_id, result='fixed')
         version, revision = version.rsplit('-', 1)
         revision = str(int(revision) + 1)
         version = version + '-' + revision

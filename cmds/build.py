@@ -33,6 +33,9 @@ def run(args):
         if args.print_builds:
             print('{}:{},{},{},{},{}'.format(build_id, *data))
             continue
+        if args.cancel:
+            db.update_build(build_id, result='canceled')
+            continue
         task = '{}: {}\'s {} in version {}:{} ({})'.format(build_id, *data)
         header(task)
         try:
@@ -85,6 +88,8 @@ def register(subparsers):
     parser.add_argument('--incognito', '-I', action='store_true',
                         help='private build, do not record any changes')
     parser.add_argument('--print-builds', '-P', action='store_true')
+    parser.add_argument('--cancel', '-C', action='store_true',
+                        help='mark build as canceled')
     parser.add_argument('builds', nargs='*', metavar='BUILDID',
                         type=int,
                         help='Specify build list explicit')
