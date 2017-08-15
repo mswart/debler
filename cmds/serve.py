@@ -7,10 +7,6 @@ import traceback
 
 import debler.db
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)-15s %(name)s %(levelname)s %(message)s',
-    filename='debler-server.log')
 log = logging.getLogger(__name__)
 
 

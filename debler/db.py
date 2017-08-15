@@ -1,6 +1,7 @@
 from datetime import datetime
 from importlib import import_module
 import json
+import logging
 import socket
 
 from dateutil.tz import tzlocal
@@ -9,6 +10,9 @@ import psycopg2
 import psycopg2.extras
 
 from debler import config
+
+
+log = logging.getLogger(__name__)
 
 
 class Version(debian_support.Version):
@@ -134,7 +138,10 @@ class Database():
     rubygems = 'https://rubygems.org'
 
     def __init__(self):
-        self.conn = psycopg2.connect(config.database)
+        self.conn = psycopg2.connect(
+            config.database,
+            connection_factory=psycopg2.extras.LoggingConnection)
+        self.conn.initialize(log)
         self.conn.autocommit = True
 
     def get_pkger(self, name):

@@ -2,17 +2,42 @@
 import sys
 import os.path
 import argparse
+import logging
 from importlib import import_module
 
 # path import path to be able to import debler and cmds:
 sys.path.insert(0, os.path.realpath(os.path.join(__file__, '..', '..')))
 
+logfile = os.getenv('DEBLER_LOG', '/dev/null')
+logformat = '%(asctime)-15s %(name)s %(levelname)s %(message)s'
+
+if logfile == '-':  # stream
+    logging.basicConfig(level=logging.DEBUG, format=logformat)
+elif logfile:
+    logging.basicConfig(level=logging.DEBUG, format=logformat,
+                        filename=logfile)
+else:
+    logging.basicConfig(level=logging.ERROR)
+
+
+def no_subaction(args):
+    parser.error('Subcommand required!')
+
 
 # build parser:
 parser = argparse.ArgumentParser(prog='debler')
+parser.set_defaults(run=no_subaction)
 subparserse = parser.add_subparsers()
 
-for cmd_name in ['pkgapp', 'build', 'publish', 'rebuild', 'gem', 'serve', 'info']:
+for cmd_name in [
+        'build',
+        'gem',
+        'info',
+        'pkgapp',
+        'publish',
+        'rebuild',
+        'serve',
+        ]:
     cmd = import_module('cmds.{}'.format(cmd_name))
     getattr(cmd, 'register')(subparserse)
 
