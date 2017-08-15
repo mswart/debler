@@ -5,6 +5,7 @@ import yaml
 from struct import pack, unpack
 import subprocess
 from shutil import move
+from types import SimpleNamespace
 from glob import glob
 
 from debian.changelog import Changelog
@@ -13,7 +14,7 @@ from debler import config
 from debler.builder import BaseBuilder, \
     SourceControl, Package, \
     BuildDependency, Dependency, Provide, \
-    Install, InstallContent, RuleAction
+    Install, InstallInto, InstallContent, RuleAction
 from .constraints import parseConstraints
 from ..constraints import dependencies4Constraints
 
@@ -384,60 +385,54 @@ Gem::Specification.new do |s|
         rules['install'] = []
         exts = self.extension_list()
         info = self.pkger.gem_info(self.gem_name)
-        ext_args = info.lookup('ext_args', '')
-        subdir = info.get('so_subdir', '')
-        rubyopts = ''
-        for load_path in self.ext_load_paths:
-            rubyopts += ' -I{path}'.format(path=load_path)
-        if len(exts) == 1:
-            yield RuleAction('build',
-                             ' v'.join(['mkdir'] + list(self.pkger.rubies)))
-            for ruby in self.pkger.rubies:
-                yield RuleAction(
-                    'build',
-                    'cd v{v} && ruby{v} {rubyopts} ../src/{} {}'.format(
-                        exts[0], ext_args, v=ruby, rubyopts=rubyopts))
-            for ruby in self.pkger.rubies:
-                yield RuleAction('build', 'make -C v{v}'.format(v=ruby))
-            for ruby in self.pkger.rubies:
-                yield RuleAction('install', ' '.join([
-                    'dh_install',
-                    '-p{package}',
-                    'v{v}/*.so',
-                    os.path.join('/', 'usr', 'lib',
-                                 '${{DEB_BUILD_MULTIARCH}}',
-                                 'rubygems-debler',
-                                 '{v}.0',
-                                 '{name}',
-                                 subdir)]).format(
-                    v=ruby, name=self.own_name,
-                    package=self.deb_name + '-ruby' + ruby))
+        Build = SimpleNamespace
 
+        defaultbuild = Build(
+            ext_args=info.lookup('ext_args', ''),
+            subdir=info.get('so_subdir', ''),
+            rubyopts=''
+        )
+        for load_path in self.ext_load_paths:
+            defaultbuild.rubyopts += ' -I{path}'.format(path=load_path)
+        if len(exts) == 1:
+            buildmatrix = [Build(
+                            ruby='ruby' + ruby,
+                            rubyversion=ruby + '.0',
+                            dir='v' + ruby,
+                            ext='../src/' + exts[0],
+                            **defaultbuild.__dict__)
+                           for ruby in self.pkger.rubies]
         elif len(exts) > 1:
-            yield RuleAction('build', ' '.join(['mkdir', '-p'] + ['v{ruby}/{ext}'.format(ext=ext.replace('/', '_'), ruby=ruby) for ext in self.metadata['extensions'] for ruby in self.pkger.rubies]))
-            for ext in exts:
-                for ruby in self.pkger.rubies:
-                    yield RuleAction('build', 'cd v{v}/{ext} && ruby{v} {rubyopts}../../src/{} {}'.format(
-                        ext, ext_args, ext=ext.replace('/', '_'), v=ruby, rubyopts=rubyopts))
-            for ext in exts:
-                for ruby in self.pkger.rubies:
-                    yield RuleAction('build', 'make -C v{v}/{ext}'.format(
-                        ext=ext.replace('/', '_'), v=ruby))
-            for ext in exts:
-                for ruby in self.pkger.rubies:
-                    yield RuleAction('install', ' '.join([
-                        'dh_install',
-                        '-p{package}',
-                        'v{v}/{ext}/*.so',
-                        os.path.join('/', 'usr', 'lib',
-                                     '${{DEB_BUILD_MULTIARCH}}',
-                                     'rubygems-debler',
-                                     '{v}.0',
-                                     '{name}',
-                                     subdir)]).format(
-                        v=ruby, name=self.own_name,
-                        package=self.deb_name + '-ruby' + ruby,
-                        ext=ext.replace('/', '_')))
+            buildmatrix = [Build(
+                            ruby='ruby' + ruby,
+                            rubyversion=ruby + '.0',
+                            dir='v' + ruby + '/' + ext.replace('/', '_'),
+                            ext='../../src/' + ext,
+                            **defaultbuild.__dict__)
+                           for ruby in self.pkger.rubies
+                           for ext in exts]
+
+        if len(exts) > 0:
+            yield RuleAction('build', 'mkdir -p ' +
+                             ' '.join(build.dir for build in buildmatrix))
+            for build in buildmatrix:
+                yield RuleAction('build',
+                                 ('cd {build.dir} && ' +
+                                  '{build.ruby} {build.rubyopts} ' +
+                                  '{build.ext} {build.ext_args}').format(
+                                    build=build))
+            for build in buildmatrix:
+                yield RuleAction('build', 'make -C ' + build.dir)
+            for build in buildmatrix:
+                yield InstallInto(
+                    self.deb_name + '-' + build.ruby,
+                    os.path.join(build.dir, '*.so'),
+                    os.path.join('/', 'usr', 'lib',
+                                 '${DEB_BUILD_MULTIARCH}',
+                                 'rubygems-debler',
+                                 build.rubyversion,
+                                 self.own_name,
+                                 build.subdir))
 
         yield InstallContent(
             self.deb_name,
@@ -468,6 +463,8 @@ Gem::Specification.new do |s|
                         elif len(parts) == current_level:  # should not happend
                             # strip extension + require path
                             require_files.append(member.name[len(path)+1:-3])
+                if member.name.startswith('ext'):
+                    continue
                 for path in self.metadata['require_paths'] + \
                         [self.metadata['bindir'], 'data', 'vendor'] + \
                         info.get('extra_dirs', []):
@@ -475,12 +472,12 @@ Gem::Specification.new do |s|
                         break
                 else:
                     continue
-                yield Install(
+                yield InstallInto(
                     self.deb_name,
                     os.path.join('src', member.name),
-                    '/usr/share/rubygems-debler/{name}/{dir}'.format(
+                    '/usr/share/rubygems-debler/{name}/{dest}'.format(
                         name=self.own_name,
-                        dir=os.path.dirname(member.name)))
+                        dest=os.path.dirname(member.name)))
         if self.orig_name in require_files:
             metadata['require'] = [self.orig_name]
         elif self.orig_name.replace('-', '/') in require_files:

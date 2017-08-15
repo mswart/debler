@@ -1,7 +1,7 @@
 import os.path
 
 from ..builder import Package, Dependency, \
-    Install, Symlink, \
+    InstallInto, Symlink, \
     InstallContent, DebianContent, \
     RuleAction
 
@@ -112,11 +112,11 @@ class BundlerAppIntegrator():
                     '/usr/share/{name}/{path}/{}'.format('lib',
                                                          name=self.app.name,
                                                          path=gem.path))
-                yield Install(self.builder.deb_name, gem.path,
-                              '/usr/share/{name}/{path}'.format(
-                                  'lib',
-                                  name=self.app.name,
-                                  path=os.path.dirname(gem.path)))
+                yield InstallInto(self.builder.deb_name, gem.path,
+                                  '/usr/share/{name}/{path}'.format(
+                                    'lib',
+                                    name=self.app.name,
+                                    path=os.path.dirname(gem.path)))
         for version in self.load_paths:
             if version == 'all':
                 continue
@@ -222,9 +222,9 @@ esac
 exit 0
 '''.format(app=self.app.name, ruby=ruby))
 
-            yield Install(self.builder.deb_name,
-                          os.path.join('debian', 'lib'),
-                          '/usr/share/{}/.debler'.format(self.app.name))
+            yield InstallInto(self.builder.deb_name,
+                              os.path.join('debian', 'lib'),
+                              '/usr/share/{}/.debler'.format(self.app.name))
 
             yield DebianContent(
                 name='lib/bundler/setup.rb',

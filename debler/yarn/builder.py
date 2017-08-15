@@ -11,7 +11,7 @@ from debler import config
 from debler.builder import BaseBuilder, \
     SourceControl, Package, \
     BuildDependency, Dependency, Provide, \
-    Install, RuleOverride
+    InstallInto, RuleOverride
 from .appinfo import YarnAppInfo
 from .constraints import parseConstraints
 from ..constraints import dependencies4Constraints
@@ -178,7 +178,7 @@ class YarnBuilder(BaseBuilder):
                     continue
                 if filename.startswith('docs'):
                     continue
-                yield Install(
+                yield InstallInto(
                     self.deb_name,
                     filename,
                     'usr/share/node-debler/{name}/{dir}'.format(

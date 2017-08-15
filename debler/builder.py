@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from collections import namedtuple, OrderedDict
+import logging
 import os
 import subprocess
 
@@ -21,10 +22,13 @@ Provide = namedtuple('Provide', 'package provide')
 Symlink = namedtuple('Symlink', 'package dest src')
 Package = namedtuple('Package', 'package architecture section description')
 Install = namedtuple('Install', 'package obj dest')
+InstallInto = namedtuple('InstallInto', 'package obj dir')
 InstallContent = namedtuple('InstallContent', 'package name dest content mode')
 DebianContent = namedtuple('InstallContent', 'name content mode')
 RuleAction = namedtuple('RuleAction', 'target cmd')
 RuleOverride = namedtuple('RuleOverride', 'target')
+
+log = logging.getLogger(__file__)
 
 
 class BaseBuilder():
@@ -76,7 +80,7 @@ Licence: See LICENCE file
         self.symlinks = {}
 
         for item in self.generate_control_content():
-            print(item)
+            log.debug(repr(item))
             if isinstance(item, SourceControl):
                 for key, value in item.items():
                     key = '-'.join([k.capitalize() for k in key.split('_')])
@@ -109,6 +113,8 @@ Licence: See LICENCE file
                 raise NotImplementedError('Got unexcepted action item'
                                           ' on control generation {!r}'.format(
                                             item))
+        if self.installs:
+            build_deps.append('dh-exec')
 
         with open(self.debian_file('control'), 'wb') as control_file:
             dsc['Build-Depends'] = ', '.join(build_deps)
@@ -125,9 +131,22 @@ Licence: See LICENCE file
     def generate_rules_file(self):
         rules = {}
         for item in self.generate_rules_content():
-            print(item)
+            log.debug(repr(item))
             if isinstance(item, Install):
-                self.installs[item.package].append((item.obj, item.dest))
+                self.installs[item.package].append(
+                    '{item.obj} => {item.dest}'.format(item=item))
+            elif isinstance(item, InstallInto):
+                if ' ' not in item.obj:
+                    self.installs[item.package].append(
+                        '{item.obj} {item.dir}/'.format(item=item))
+                else:
+                    # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=198507
+                    # https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=867866
+                    rules.setdefault('install', [])
+                    rules['install'].append(
+                        ('mkdir -p "debian/{item.package}/{item.dir}" && ' +
+                         ' cp "{item.obj}" "debian/{item.package}/{item.dir}"')
+                        .format(item=item))
             elif isinstance(item, Symlink):
                 self.symlinks[item.package].append((item.dest, item.src))
             elif isinstance(item, RuleOverride):
@@ -147,10 +166,9 @@ Licence: See LICENCE file
                 with open(self.debian_file(item.name), 'w') as f:
                     f.write(item.content)
                 os.chmod(self.debian_file(item.name), item.mode)
-                self.installs[item.package].append((
-                    os.path.join('debian', item.name),
-                    item.dest
-                ))
+                self.installs[item.package].append(
+                    'debian/{item.name} {item.dest}'.format(item=item)
+                )
             elif isinstance(item, DebianContent):
                 os.makedirs(os.path.dirname(self.debian_file(item.name)),
                             exist_ok=True)
@@ -160,7 +178,7 @@ Licence: See LICENCE file
             else:
                 raise NotImplementedError('Got unexcepted action item'
                                           ' on rules generation {!r}'.format(
-                                            item))
+                                              item))
 
         with open(self.debian_file('rules'), 'w') as f:
             f.write("#!/usr/bin/make -f\n%:\n\tdh $@\n")
@@ -172,9 +190,10 @@ Licence: See LICENCE file
 
         for deb, installs in self.installs.items():
             with open(self.debian_file(deb + '.install'), 'w') as f:
-                print(installs)
-                for file, dir in installs:
-                    f.write('{} {}\n'.format(file, dir))
+                f.write('#!/usr/bin/dh-exec\n')
+                f.write('\n'.join(installs))
+                f.write('\n')
+            os.chmod(self.debian_file(deb + '.install'), 0o755)
 
         for deb, symlinks in self.symlinks.items():
             if not symlinks:

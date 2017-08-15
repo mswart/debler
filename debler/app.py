@@ -10,7 +10,7 @@ from dateutil.tz import tzlocal
 from debler.builder import BaseBuilder, \
     SourceControl, Package, \
     BuildDependency, Dependency, \
-    Install
+    InstallInto
 from debler import config
 
 
@@ -124,11 +124,11 @@ class AppBuilder(BaseBuilder):
 
     def generate_rules_content(self):
         for dir in self.app.dirs:
-            yield Install(self.deb_name, dir,
-                          '/usr/share/{}\n'.format(self.app.name))
+            yield InstallInto(self.deb_name, dir,
+                              '/usr/share/{}'.format(self.app.name))
         for file in self.app.files:
-            yield Install(self.deb_name, file,
-                          '/usr/share/{}\n'.format(self.app.name))
+            yield InstallInto(self.deb_name, file,
+                              '/usr/share/{}'.format(self.app.name))
 
         for pkger in self.packagers:
             yield from pkger.generate_rules_content()
