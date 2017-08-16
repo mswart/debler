@@ -13,7 +13,7 @@ def run(args):
             slot = info.slot_for_version(version, create=True)
             slot.create(
                 version=version, revision=1,
-                changelog='Import newly into debler',
+                changelog='Import specific version',
                 distribution=config.distribution,
                 extra={})
         return
