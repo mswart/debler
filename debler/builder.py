@@ -27,6 +27,7 @@ InstallContent = namedtuple('InstallContent', 'package name dest content mode')
 DebianContent = namedtuple('InstallContent', 'name content mode')
 RuleAction = namedtuple('RuleAction', 'target cmd')
 RuleOverride = namedtuple('RuleOverride', 'target')
+FastBuild = namedtuple('FastBuild', 'possible')
 
 log = logging.getLogger(__file__)
 
@@ -46,6 +47,7 @@ class BaseBuilder():
 
     def gen_debian_package(self):
         os.makedirs(self.debian_file('source'), exist_ok=True)
+        self.fast_build = None
         self.generate_source_format()
         self.generate_compat_file()
         self.generate_copyright_file()
@@ -109,6 +111,11 @@ Licence: See LICENCE file
                 packages[item.package][2].append(item.provide)
             elif isinstance(item, Symlink):
                 self.symlinks[item.package].append((item.dest, item.src))
+            elif isinstance(item, FastBuild):
+                if self.fast_build is None:
+                    self.fast_build = item.possible
+                else:
+                    self.fast_build = self.fast_build and item.possible
             else:
                 raise NotImplementedError('Got unexcepted action item'
                                           ' on control generation {!r}'.format(
@@ -175,6 +182,11 @@ Licence: See LICENCE file
                 with open(self.debian_file(item.name), 'w') as f:
                     f.write(item.content)
                 os.chmod(self.debian_file(item.name), item.mode)
+            elif isinstance(item, FastBuild):
+                if self.fast_build is None:
+                    self.fast_build = item.possible
+                else:
+                    self.fast_build = self.fast_build and item.possible
             else:
                 raise NotImplementedError('Got unexcepted action item'
                                           ' on rules generation {!r}'.format(
@@ -219,11 +231,15 @@ Licence: See LICENCE file
         self.extract_orig_tar()
         self.gen_debian_package()
         self.create_source_package()
-        self.upload_source_package()
 
     def run(self):
-        os.chdir(self.slot_dir)
+        if self.fast_build:
+            self.build_native()
+        else:
+            self.build_with_sbuild()
 
+    def build_with_sbuild(self):
+        os.chdir(self.slot_dir)
         try:
             subprocess.check_call(['sbuild',
                                    '--nolog',
@@ -233,5 +249,17 @@ Licence: See LICENCE file
                                    '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
         except subprocess.CalledProcessError:
             raise BuildFailError()
+
+    def build_native(self):
+        os.chdir(self.pkg_dir)
+        subprocess.check_call(['dpkg-buildpackage',
+                               '-b',  # build binary packages
+                               '-m' + config.maintainer,
+                               '-us',  # no signing of source changes
+                               '-rfakeroot',  # use fakeroot as sudo "replacement"
+                               ])
+
+    def upload(self):
+        self.upload_source_package()
         changes = '{}_{}_amd64.changes'.format(self.deb_name, self.deb_version)
         subprocess.check_call(['dput', self.package_upload, os.path.join(self.tmp_dir, changes)])

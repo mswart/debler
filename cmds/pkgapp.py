@@ -28,6 +28,7 @@ def run(args):
             builder.run()
         except BuildFailError:
             sys.exit(5)
+        builder.upload()
 
 
 def register(subparsers):

@@ -11,7 +11,8 @@ from debler import config
 from debler.builder import BaseBuilder, \
     SourceControl, Package, \
     BuildDependency, Dependency, Provide, \
-    InstallInto, RuleOverride
+    InstallInto, RuleOverride, \
+    FastBuild
 from .appinfo import YarnAppInfo
 from .constraints import parseConstraints
 from ..constraints import dependencies4Constraints
@@ -106,6 +107,8 @@ class YarnBuilder(BaseBuilder):
         os.symlink(self.tarxz_file, self.orig_tar)
 
     def generate_control_content(self):
+        yield FastBuild(True)
+
         # define source metadata
         yield SourceControl(
             source=self.deb_name,

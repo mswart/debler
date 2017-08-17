@@ -45,6 +45,8 @@ def run(args):
                 builder = db.get_pkger(data[0]).builder(d, build_id)
                 builder.generate()
                 builder.run()
+                if not args.incognito:
+                    builder.upload()
             if not args.incognito:
                 db.update_build(build_id, result='finished')
             header(task, color=32)

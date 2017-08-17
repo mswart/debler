@@ -10,7 +10,7 @@ from dateutil.tz import tzlocal
 from debler.builder import BaseBuilder, \
     SourceControl, Package, \
     BuildDependency, Dependency, \
-    InstallInto
+    InstallInto, FastBuild
 from debler import config
 
 
@@ -101,6 +101,8 @@ class AppBuilder(BaseBuilder):
             changes.write_to_open_file(f)
 
     def generate_control_content(self):
+        yield FastBuild(True)
+
         yield SourceControl(
             source=self.deb_name,
             priority='optional',

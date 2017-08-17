@@ -14,7 +14,8 @@ from debler import config
 from debler.builder import BaseBuilder, \
     SourceControl, Package, \
     BuildDependency, Dependency, Provide, \
-    Install, InstallInto, InstallContent, RuleAction
+    InstallInto, InstallContent, RuleAction, \
+    FastBuild
 from .constraints import parseConstraints
 from ..constraints import dependencies4Constraints
 
@@ -240,6 +241,7 @@ class GemBuilder(BaseBuilder):
             for ruby in self.pkger.rubies:
                 yield BuildDependency('ruby{}'.format(ruby))
                 yield BuildDependency('ruby{}-dev'.format(ruby))
+        yield FastBuild(len(exts) == 0)  # extension prohibite fast build
 
         info = self.pkger.gem_info(self.gem_name)
         if info.native is None:  # auto-detect on first build
