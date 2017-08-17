@@ -14,8 +14,8 @@ class BundlerPackager(Packager):
     }
 
     def __init__(self, *args, rubies,
-                 rubygems: "https://rubygems.org",
-                 rubygems_apikey: None):
+                 rubygems='https://rubygems.org',
+                 rubygems_apikey=None):
         super().__init__(*args)
         self.rubies = rubies
         self.rubygems = rubygems
