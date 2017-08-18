@@ -246,7 +246,7 @@ exit 0
                     continue
                 for require in self.gem_metadatas.get(
                         name, {'require': [name.replace('-', '/')]}) \
-                        .get('require', []):
+                        .get('require', []) or [name.replace('-', '/')]:
                     if 'default' in gem.envs:
                         bundler_content += '    Kernel.require "{}"\n' \
                             .format(require)
