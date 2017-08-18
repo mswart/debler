@@ -236,7 +236,7 @@ exit 0
   def self.require(*groups)
     groups = groups.map(&:to_s)
 '''
-            for name in self.app.gemfile.sorted_gems:
+            for name in self.app.gemfile.required_gems:
                 gem = self.app.gemfile.gems[name]
                 if not gem.require:
                     continue

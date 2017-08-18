@@ -177,33 +177,22 @@ class Parser():
         for gem in ignore_gems:
             self.gems.pop(gem, None)
 
-        self.sorted_gems = list(self.sort_gems())
-
-    def sort_gems(self):
-        loaded = set()
-        gems_yield = True
-        while gems_yield:
-            gems_yield = False
-            for gem in sorted(self.gems):
-                if gem in loaded:
-                    continue
-                if len(set(self.gems[gem].deps.keys()).difference(loaded)) == 0:
-                    loaded.add(gem)
-                    gems_yield = True
-                    yield gem
-
     def parse_gemfile(self, file):
         d = parser.parse(open(file, 'r'))
         assignments = {}
+        self.required_gems = []
         for o in d:
             if type(o) is Assignment:
+                self.required_gems.append(o.name)
                 assignments[o.name] = o.value
             elif type(o) is GemfileGem:
+                self.required_gems.append(o.name)
                 self.gems[o.name] = Gem(o.name, None, self.resolve(assignments, o.constraints),
                                         o.opts['envs'], o.opts.get('require', True),
                                         o.opts.get('path', None))
             elif type(o) is tuple:
                 for os in o:
+                    self.required_gems.append(os.name)
                     self.gems[os.name] = Gem(os.name, None, self.resolve(assignments, os.constraints),
                                              os.opts['envs'], os.opts.get('require', True),
                                              os.opts.get('path', None))
