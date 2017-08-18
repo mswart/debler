@@ -218,13 +218,10 @@ Licence: See LICENCE file
         os.chdir(self.pkg_dir)
         subprocess.check_call(['dpkg-buildpackage', '-S', '-sa', '-d'])
 
-    def upload_source_package(self):
-        changes = '{}_{}_source.changes'.format(
-            self.deb_name, self.deb_version)
-        subprocess.check_call(['dput',
-                               self.package_upload,
-                               os.path.join(self.tmp_dir, changes)])
-        os.unlink(os.path.join(self.tmp_dir, changes))
+    def changes_path(self, arch):
+        changes = '{}_{}_{}.changes'.format(
+            self.deb_name, self.deb_version, arch)
+        return os.path.join(self.tmp_dir, changes)
 
     def generate(self):
         self.build_orig_tar()
@@ -240,15 +237,19 @@ Licence: See LICENCE file
 
     def build_with_sbuild(self):
         os.chdir(self.slot_dir)
+        # sbuild would try to resign source changes; rename it tempoarily
+        os.rename(self.changes_path('source'), self.changes_path('tmp'))
         try:
             subprocess.check_call(['sbuild',
                                    '--nolog',
                                    '--dist', config.distribution,
                                    '--keyid', config.keyid,
                                    '--maintainer', config.maintainer,
-                                   '{}_{}.dsc'.format(self.deb_name, self.deb_version)])
+                                   '{}_{}.dsc'.format(self.deb_name,
+                                                      self.deb_version)])
         except subprocess.CalledProcessError:
             raise BuildFailError()
+        os.rename(self.changes_path('tmp'), self.changes_path('source'))
 
     def build_native(self):
         os.chdir(self.pkg_dir)
@@ -256,10 +257,13 @@ Licence: See LICENCE file
                                '-b',  # build binary packages
                                '-m' + config.maintainer,
                                '-us',  # no signing of source changes
-                               '-rfakeroot',  # use fakeroot as sudo "replacement"
+                               '-rfakeroot',  # use fakeroot as sudo cmd
                                ])
 
     def upload(self):
-        self.upload_source_package()
-        changes = '{}_{}_amd64.changes'.format(self.deb_name, self.deb_version)
-        subprocess.check_call(['dput', self.package_upload, os.path.join(self.tmp_dir, changes)])
+        subprocess.check_call(['dput',
+                               self.package_upload,
+                               self.changes_path('source')])
+        subprocess.check_call(['dput',
+                               self.package_upload,
+                               self.changes_path('amd64')])
