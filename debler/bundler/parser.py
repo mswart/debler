@@ -183,7 +183,6 @@ class Parser():
         self.required_gems = []
         for o in d:
             if type(o) is Assignment:
-                self.required_gems.append(o.name)
                 assignments[o.name] = o.value
             elif type(o) is GemfileGem:
                 self.required_gems.append(o.name)
