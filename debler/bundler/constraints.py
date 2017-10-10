@@ -9,9 +9,13 @@ from debler.constraints import GreaterThan, GreaterEqual, \
 def eval_tilde(version):
     yield GreaterEqual(version)
 
-    max_version = version.split('.')[:-1]
-    max_version[-1] = str(int(max_version[-1]) + 1)
-    max_version = '.'.join(max_version)
+    # remove prerelease suffix:
+    version, *prerelease = re.split('[^0-9.]', version, maxsplit=1)
+    segments = version.split('.')
+    if len(segments) > 1:  # do not require major version
+        segments.pop()
+    segments[-1] = str(int(segments[-1]) + 1)
+    max_version = '.'.join(segments)
     yield LessThan(max_version)
 
 
