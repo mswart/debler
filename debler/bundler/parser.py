@@ -171,11 +171,13 @@ class Parser():
         self.parse_gemfile(gemfile)
         self.parse_gemlock(gemfile + '.lock')
 
-        # ignore bundler listing:
-        self.gems.pop('bundler', None)
-        # ignore custom gems:
-        for gem in ignore_gems:
+        # ignore custom gems and bundler:
+        for gem in ignore_gems + ['bundler']:
             self.gems.pop(gem, None)
+            try:
+                self.required_gems.remove(gem)
+            except ValueError:
+                pass
 
     def parse_gemfile(self, file):
         d = parser.parse(open(file, 'r'))
