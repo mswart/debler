@@ -51,3 +51,10 @@ Some important planed features:
 * license management
 * improve package publishing (e.g. remove old versions)
 * bundler/rails: separate binary packages for individual rails environments
+
+
+### License
+
+LGPL License
+
+Copyright (c) 2016-2017 Malte Swart. LGPL license, see LICENSE for more details.
