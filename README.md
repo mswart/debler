@@ -22,8 +22,11 @@ Debler maps the gem dependencies directly on Debian packages, resulting in a mor
 
 ### Status
 
-Debler is highly under development. This can package full `rails-api` projects on a prototype basic. Further experiments and bugfixes are planed for the new future. The goal is the use Debler productively 2018.
-Therefore, more documentation and tests will be added.
+Debler is a prototype (developed during my master thesis). It successfully packaged multiple full `rails` applications with yarn as frontend package manager. Sadly, I didn't have the time to continue development or introduce its use in production.
+
+The project remains as reference and maybe inspiration.
+
+I will try to answer questions should they arise. Simple open an issue but be patient.
 
 
 ### Architecture
@@ -35,7 +38,7 @@ They are used to schedule gem package upgrade and used when packaging applicatio
 Debler is implemented in Python 3. Python 3 is a modern scripting language, has good tooling for Debian (package) development. All needed dependencies exists as Debian packages, allow a easy packaging of Debler itself without chicken-egg problem.
 
 
-### Dependencies
+### Python Dependencies
 
 * debian
 * dateutil
@@ -43,9 +46,9 @@ Debler is implemented in Python 3. Python 3 is a modern scripting language, has 
 * lepl 
 
 
-### Planed/missing Features
+### Missing Features
 
-Some important planed features:
+Originally planed features:
 
 * multi distribution support
 * license management
